@@ -1,0 +1,21 @@
+*.log
+*.sqlite
+*.sqlite3
+.DS_Store
+Thumbs.db
+.env
+.env.*
+!.env.example
+.phpunit.result.cache
+app-pos/vendor/
+app-pos/node_modules/
+app-pos/public/build/
+app-pos/public/storage
+app-pos/storage/logs/
+app-pos/storage/framework/cache/
+app-pos/storage/framework/sessions/
+app-pos/storage/framework/views/
+pos_mobile_app/build/
+pos_mobile_app/.dart_tool/
+WhatsApp Image*
+app-pos/generate_icons.php
