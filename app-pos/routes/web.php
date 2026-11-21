@@ -35,7 +35,3 @@ Route::get('/pos', function () {
 Route::get('/dashboard', function () {
     return view('dashboard.index');
 })->name('dashboard');
-
-Route::get('/portal', function () {
-    return view('portal.index');
-})->name('portal');

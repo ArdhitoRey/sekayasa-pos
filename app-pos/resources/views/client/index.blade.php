@@ -177,7 +177,7 @@
                                     </div>
 
                                     <p class="text-[11px] text-[#524538] leading-relaxed">
-                                        Integrasi payment gateway <b>Midtrans</b> sedang dalam tahap pengajuan. Setelah pembayaran dikonfirmasi/diverifikasi oleh Admin melalui Portal Internal, layanan kasir POS (`/pos`) dan dashboard (`/dashboard`) akan otomatis aktif di akun Anda.
+                                        Integrasi payment gateway <b>Midtrans</b> sedang dalam tahap pengajuan. Setelah pembayaran dikonfirmasi/diverifikasi oleh Super Admin, layanan kasir POS (`/pos`) dan dashboard (`/dashboard`) akan otomatis aktif di akun Anda.
                                     </p>
 
                                     <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
@@ -500,7 +500,7 @@ function clientPortalApp() {
                         Swal.fire({
                             icon: 'info',
                             title: 'Menunggu Verifikasi',
-                            text: 'Tagihan masih berstatus pending. Integrasi Midtrans dalam tahap pengajuan, silakan konfirmasi ke Admin Portal.',
+                            text: 'Tagihan masih berstatus pending. Integrasi Midtrans dalam tahap pengajuan, silakan konfirmasi ke tim kami.',
                             confirmButtonColor: '#775229',
                         });
                     }

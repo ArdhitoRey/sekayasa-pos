@@ -2,12 +2,13 @@
 
 namespace Tests\Feature;
 
-use App\Models\ClientLead;
 use App\Models\Plan;
+use App\Models\SubscriptionPayment;
 use App\Models\UatTestCase;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class ClientAccountFlowTest extends TestCase
@@ -21,7 +22,7 @@ class ClientAccountFlowTest extends TestCase
         $this->postJson('/api/client/consultations', [])->assertStatus(401);
     }
 
-    public function test_register_then_request_custom_consultation_and_rent_template(): void
+    public function test_register_then_request_custom_consultation_with_isolation(): void
     {
         $this->seed(DatabaseSeeder::class);
 
@@ -65,18 +66,19 @@ class ClientAccountFlowTest extends TestCase
         $this->withHeader('Authorization', "Bearer {$token}")
             ->postJson("/api/client/uat/{$otherUat->id}", ['status' => 'pass'])
             ->assertStatus(403);
+    }
 
-        // 5. Path A: Fresh client creates Subscription invoice (Midtrans pending -> Portal admin verifies)
-        $freshLogin = $this->postJson('/api/login', [
-            'email' => 'klien@usaha.id',
-            'password' => 'password123',
-        ]);
-        $freshLogin->assertStatus(200);
-        $freshToken = $freshLogin->json('data.token');
+    public function test_client_can_create_subscription_invoice_and_superadmin_verifies_it(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+
+        $clientUser = User::where('email', 'klien@usaha.id')->first();
+        $superAdmin = User::where('email', 'superadmin@pos.id')->first();
         $plan = Plan::where('slug', 'business')->first();
 
-        $rentRes = $this->withHeader('Authorization', "Bearer {$freshToken}")
-            ->postJson('/api/client/rent-template', ['plan_id' => $plan->id]);
+        // 1. Fresh client creates Subscription invoice
+        Sanctum::actingAs($clientUser);
+        $rentRes = $this->postJson('/api/client/rent-template', ['plan_id' => $plan->id]);
         $rentRes->assertStatus(201);
 
         $payment = $rentRes->json('data.payment');
@@ -84,19 +86,23 @@ class ClientAccountFlowTest extends TestCase
         $this->assertEquals('pending', $payment['status']);
 
         // Before verification, status is pending
-        $pollBefore = $this->withHeader('Authorization', "Bearer {$freshToken}")
-            ->getJson("/api/client/payments/{$payment['id']}/status");
+        $pollBefore = $this->getJson("/api/client/payments/{$payment['id']}/status");
         $pollBefore->assertStatus(200);
         $this->assertEquals('pending', $pollBefore->json('data.payment_status'));
 
-        // Portal Admin verifies subscription payment while Midtrans is in application
-        $verifyRes = $this->postJson("/api/portal/subscription-payments/{$payment['id']}/verify");
+        // Non-superadmin cannot verify payments (403)
+        $this->postJson("/api/admin/subscription-payments/{$payment['id']}/verify")
+            ->assertStatus(403);
+
+        // 2. Super Admin verifies subscription payment via Dashboard Admin endpoint
+        Sanctum::actingAs($superAdmin);
+        $verifyRes = $this->postJson("/api/admin/subscription-payments/{$payment['id']}/verify");
         $verifyRes->assertStatus(200);
         $this->assertEquals('verified', $verifyRes->json('data.payment.status'));
 
-        // Polling confirms verification & unlocked POS access
-        $pollAfter = $this->withHeader('Authorization', "Bearer {$freshToken}")
-            ->getJson("/api/client/payments/{$payment['id']}/status");
+        // 3. Client polling confirms verification & unlocked POS access
+        Sanctum::actingAs($clientUser);
+        $pollAfter = $this->getJson("/api/client/payments/{$payment['id']}/status");
         $pollAfter->assertStatus(200);
         $this->assertEquals('verified', $pollAfter->json('data.payment_status'));
         $this->assertEquals('template_saas', $pollAfter->json('data.service_type'));

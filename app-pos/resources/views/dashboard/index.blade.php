@@ -44,9 +44,9 @@
                 <button @click="setTab('outlets')" :class="tab === 'outlets' ? 'bg-[#F7B05F] text-[#1A1208] font-bold' : 'text-[#C4B5A2] hover:bg-[#23190D] hover:text-[#F7F3EC]'" class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded transition">
                     <i data-lucide="store" class="w-4 h-4"></i> Outlet & Profil
                 </button>
-                <a href="/portal" class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded transition text-[#F7B05F] hover:bg-[#23190D] border border-[rgba(247,176,95,0.2)] mt-2">
-                    <i data-lucide="rocket" class="w-4 h-4"></i> Portal Deploy PRD v2
-                </a>
+                <button x-show="user.role === 'superadmin'" @click="setTab('admin_platform')" :class="tab === 'admin_platform' ? 'bg-[#F7B05F] text-[#1A1208] font-bold' : 'text-[#F7B05F] hover:bg-[#23190D] border border-[rgba(247,176,95,0.2)]'" class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded transition mt-2" x-cloak>
+                    <i data-lucide="shield-check" class="w-4 h-4"></i> Verifikasi & Konsultasi
+                </button>
             </nav>
         </div>
 
@@ -320,6 +320,53 @@
                 </div>
             </div>
 
+            <!-- TAB 6: SUPER ADMIN PLATFORM (VERIFIKASI LANGGANAN & KONSULTASI) -->
+            <div x-show="tab === 'admin_platform'" class="space-y-6" x-cloak>
+                <div class="bg-[#F3EDE4] rounded-md border border-[rgba(119,82,41,0.22)] overflow-hidden">
+                    <div class="px-5 py-3.5 bg-[#1A1208] text-[#F7F3EC] flex justify-between items-center">
+                        <span class="text-xs font-bold text-[#F7B05F]">01 / Verifikasi Pembayaran Langganan (Midtrans Dalam Pengajuan)</span>
+                        <button @click="loadAdminPlatform()" class="text-xs text-[#C4B5A2] hover:text-[#F7F3EC]">Muat Ulang</button>
+                    </div>
+                    <div class="divide-y divide-[rgba(119,82,41,0.16)]">
+                        <template x-for="pay in adminPayments" :key="pay.id">
+                            <div class="p-4 flex flex-wrap items-center justify-between gap-4 text-xs">
+                                <div>
+                                    <div class="font-bold text-[#1A1208]">
+                                        <span class="font-mono text-[#775229]" x-text="pay.invoice_number"></span> — <span x-text="pay.business ? pay.business.name : '-'"></span>
+                                    </div>
+                                    <div class="text-[#524538] mt-0.5">Paket: <b x-text="pay.plan ? pay.plan.name : '-'"></b> • Status: <b class="uppercase" x-text="pay.status"></b></div>
+                                </div>
+                                <div class="flex items-center gap-4">
+                                    <span class="font-mono font-bold text-[#1A1208]" x-text="formatRupiah(pay.amount)"></span>
+                                    <button x-show="pay.status === 'pending'" @click="verifyAdminPayment(pay.id)" class="px-3.5 py-1.5 bg-[#775229] hover:bg-[#583B1B] text-[#FAF7F2] rounded font-bold">
+                                        Verifikasi & Aktifkan
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+                        <div x-show="adminPayments.length === 0" class="p-6 text-center text-xs text-[#524538]">Belum ada tagihan langganan.</div>
+                    </div>
+                </div>
+
+                <div class="bg-[#F3EDE4] rounded-md border border-[rgba(119,82,41,0.22)] overflow-hidden">
+                    <div class="px-5 py-3.5 bg-[#1A1208] text-[#F7F3EC]">
+                        <span class="text-xs font-bold text-[#F7B05F]">02 / Daftar Pengajuan Konsultasi Custom Klien</span>
+                    </div>
+                    <div class="divide-y divide-[rgba(119,82,41,0.16)]">
+                        <template x-for="c in adminConsultations" :key="c.id">
+                            <div class="p-4 text-xs space-y-1">
+                                <div class="flex justify-between items-center">
+                                    <b class="text-[#1A1208]" x-text="c.business_name + ' (' + c.client_name + ')'"></b>
+                                    <span class="px-2 py-0.5 bg-[#F2EBE1] text-[#775229] rounded font-bold uppercase text-[10px]" x-text="c.status"></span>
+                                </div>
+                                <div class="text-[#524538]" x-text="c.business_type + ' • ' + (c.phone || c.email)"></div>
+                                <p class="text-[#1A1208]" x-text="c.template_gap_notes || c.notes"></p>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
         </div>
 
     </main>
@@ -390,7 +437,10 @@ function dashboardApp() {
             inventory: 'Inventori & Audit Mutasi Stok',
             reports: 'Laporan Penjualan & Laba Kotor',
             outlets: 'Manajemen Outlet & Profil Bisnis',
+            admin_platform: 'Verifikasi Langganan & Konsultasi Klien',
         },
+        adminPayments: [],
+        adminConsultations: [],
         dashboardData: {},
         salesChartInstance: null,
         productList: [],
@@ -429,7 +479,24 @@ function dashboardApp() {
             if (t === 'products') this.loadProductsTable();
             if (t === 'inventory') this.loadInventoryData();
             if (t === 'reports') this.loadReports();
+            if (t === 'admin_platform') this.loadAdminPlatform();
             this.$nextTick(() => lucide.createIcons());
+        },
+        async loadAdminPlatform() {
+            const res = await this.authFetch('/api/admin/platform-overview');
+            const data = await res.json();
+            if (data.status === 'success') {
+                this.adminPayments = data.data.subscription_payments || [];
+                this.adminConsultations = data.data.consultations || [];
+            }
+        },
+        async verifyAdminPayment(id) {
+            const res = await this.authFetch(`/api/admin/subscription-payments/${id}/verify`, { method: 'POST' });
+            const result = await res.json();
+            if (res.ok) {
+                Swal.fire({ icon: 'success', title: 'Terverifikasi!', text: result.message, confirmButtonColor: '#775229' });
+                await this.loadAdminPlatform();
+            }
         },
         onOutletChange() { this.refreshData(); },
         refreshData() { this.setTab(this.tab); },

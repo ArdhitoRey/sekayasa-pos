@@ -10,8 +10,8 @@
         <a href="/" class="text-xs font-semibold text-[#C4B5A2] hover:text-[#F7B05F] transition flex items-center gap-2">
             ← Kembali ke Beranda Seka Yasa
         </a>
-        <a href="/portal" class="text-xs font-semibold text-[#F7B05F] hover:underline">
-            Buka Portal Internal & Deploy →
+        <a href="/contact" class="text-xs font-semibold text-[#F7B05F] hover:underline">
+            Konsultasi Kebutuhan →
         </a>
     </div>
 
@@ -21,7 +21,7 @@
         <div class="bg-[#23190D] px-8 py-7 text-[#F7F3EC] border-b border-[rgba(247,176,95,0.18)]">
             <div class="text-xs font-semibold tracking-wider text-[#F7B05F] mb-1">00 / Akses Operasional</div>
             <h1 class="text-2xl font-bold tracking-tight">Seka Yasa POS</h1>
-            <p class="text-[#C4B5A2] text-xs mt-1">Masuk sebagai Kasir, Admin Toko, Owner, atau Operator Portal</p>
+            <p class="text-[#C4B5A2] text-xs mt-1">Masuk sebagai Kasir, Admin Toko, Owner, atau Akun Klien</p>
         </div>
 
         <div class="p-8">
@@ -107,10 +107,6 @@
                         <div class="text-[10px] text-[#524538]">Lacak UAT & Status</div>
                     </button>
                 </div>
-
-                <a href="/portal" class="mt-3 w-full py-2.5 bg-[#1A1208] hover:bg-[#23190D] text-[#F7B05F] rounded-md text-xs font-bold transition flex items-center justify-center gap-2 border border-[rgba(119,82,41,0.3)]">
-                    Portal Internal & One-Click Deploy →
-                </a>
             </div>
         </div>
     </div>

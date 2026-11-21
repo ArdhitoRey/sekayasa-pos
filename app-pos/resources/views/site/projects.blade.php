@@ -141,44 +141,44 @@
         <div class="sy-showcase">
             <div class="sy-showcase-media bg-[#1A1208] border border-[rgba(247,176,95,0.22)] rounded-lg p-6 text-[#F7F3EC]">
                 <div class="flex justify-between text-xs pb-3 mb-4 border-b border-[rgba(247,176,95,0.16)] text-[#F7B05F] font-semibold">
-                    <span>SISTEM 03 — PORTAL & ORCHESTRATOR DEPLOY</span>
-                    <span class="font-mono">7-GATE CHECKLIST</span>
+                    <span>SISTEM 03 — AKUN KLIEN & KONSULTASI CUSTOM</span>
+                    <span class="font-mono">CLIENT ISOLATION</span>
                 </div>
                 <div class="space-y-2 text-xs font-mono">
                     <div class="p-2.5 bg-[#23190D] rounded flex justify-between">
-                        <span>Client: Apotek Medika Sehat (Unpaid)</span>
-                        <span class="text-[#C4B5A2]">LOCKED (HTTP 422)</span>
+                        <span>Opsi A: Sewa Template POS Standar</span>
+                        <span class="text-[#F7B05F]">ACTIVE SUBSCRIPTION</span>
                     </div>
                     <div class="p-2.5 bg-[#23190D] rounded flex justify-between">
-                        <span>Client: Kopi Senopati (100% Paid + UAT Pass)</span>
-                        <span class="text-[#F7B05F]">READY TO DEPLOY</span>
+                        <span>Opsi B: Konsultasi Proses Bisnis Custom</span>
+                        <span class="text-[#F7B05F]">SCHEDULED</span>
                     </div>
                     <div class="p-3 bg-black/50 rounded text-[11px] text-[#C4B5A2]">
-                        &gt; Snapshot Database: PROD-SNAPSHOT-20261121<br>
-                        &gt; Rollback Strategy: Ready (Zero Data Loss Policy)
+                        &gt; Proposal SOW & UAT Checklist terisolasi per akun klien<br>
+                        &gt; Verifikasi pembayaran terintegrasi menuju Midtrans
                     </div>
                 </div>
             </div>
 
             <div class="sy-showcase-copy">
                 <div class="sy-index text-[#775229] mb-2">Karya 03</div>
-                <h2 class="sy-h2 text-[#1A1208]">Portal Internal Proyek Custom & One-Click Deploy</h2>
+                <h2 class="sy-h2 text-[#1A1208]">Portal Akun Klien untuk Sewa Layanan & Konsultasi Custom</h2>
                 <div class="mt-6 border-t border-[rgba(119,82,41,0.18)] divide-y divide-[rgba(119,82,41,0.18)] text-sm">
                     <div class="py-3.5 grid grid-cols-[130px_1fr] gap-4">
                         <span class="font-bold text-[#775229]">Kondisi Awal</span>
-                        <span class="text-[#524538]">Proyek custom sering dikerjakan sebelum pembayaran lunas dan rilis ke server produksi dilakukan manual yang rawan kesalahan konfigurasi.</span>
+                        <span class="text-[#524538]">Klien kesulitan mengetahui apakah proses usahanya cocok dengan template standar dan tidak memiliki ruang terpisah untuk memantau konsultasi atau UAT.</span>
                     </div>
                     <div class="py-3.5 grid grid-cols-[130px_1fr] gap-4">
                         <span class="font-bold text-[#775229]">Solusi Sistem</span>
-                        <span class="text-[#524538]">Portal pelacak Lead–SOW–UAT dengan Payment Gate 100% wajib serta tombol Deploy Staging/Production berpengaman 7 pre-check dan rollback.</span>
+                        <span class="text-[#524538]">Halaman akun terautentikasi (/client) dengan dua jalur jelas: sewa paket template POS langsung atau pengajuan konsultasi custom beserta pelacakan UAT.</span>
                     </div>
                     <div class="py-3.5 grid grid-cols-[130px_1fr] gap-4">
                         <span class="font-bold text-[#775229]">Hasil di Lapangan</span>
-                        <span class="text-[#1A1208] font-medium">Tidak ada rilis produksi yang melewati UAT atau backup database, dan status kontrak bulanan klien terekam rapi.</span>
+                        <span class="text-[#1A1208] font-medium">Seluruh riwayat sewa paket, jadwal konsultasi custom, dan persetujuan UAT tercatat rapi dan terisolasi per akun bisnis.</span>
                     </div>
                 </div>
                 <div class="mt-6">
-                    <a href="/portal" class="inline-block pb-1 text-sm font-bold text-[#1A1208] border-b-[1.5px] border-[#775229] hover:text-[#775229]">Buka Portal Internal & Deploy →</a>
+                    <a href="/client" class="inline-block pb-1 text-sm font-bold text-[#1A1208] border-b-[1.5px] border-[#775229] hover:text-[#775229]">Buka Halaman Akun Klien →</a>
                 </div>
             </div>
         </div>

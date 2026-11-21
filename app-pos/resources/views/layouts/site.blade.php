@@ -234,7 +234,7 @@
                 <span class="text-[#775229]">|</span>
                 <a href="/pos" class="text-[#F7B05F] hover:underline">Layar Kasir POS</a>
                 <a href="/dashboard" class="text-[#F7B05F] hover:underline">Dashboard Owner</a>
-                <a href="/portal" class="text-[#F7B05F] hover:underline">Portal One-Click Deploy</a>
+                <a href="/client" class="text-[#F7B05F] hover:underline">Akun & Konsultasi Klien</a>
             </div>
         </div>
         <div class="sy-container mt-10 pt-6 border-t border-[rgba(247,176,95,0.12)] flex flex-col sm:flex-row justify-between text-xs text-[#C4B5A2]/70 gap-2">

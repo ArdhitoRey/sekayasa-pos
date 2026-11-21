@@ -1,13 +1,13 @@
-# Seka Yasa POS — Layanan Konsultasi, Custom POS & One-Click Deployment
+# Seka Yasa POS — Layanan Konsultasi & Sistem Kasir Custom
 
-Sistem **Point of Sale (POS)** multi-tenant, Portal Klien, Portal Internal Penyedia Jasa (*Custom Development & One-Click Deployment*), serta Aplikasi Kasir Android (PWA WebAPK & Flutter).
+Sistem **Point of Sale (POS)** multi-tenant, Halaman Akun Klien & Konsultasi Custom (`/client`), Terminal Kasir (`/pos`), Dashboard Pemilik & Super Admin (`/dashboard`), serta Aplikasi Kasir Android (PWA WebAPK & Flutter).
 
 ## Struktur Repositori
 
-- `app-pos/` — Aplikasi Backend Laravel 13 (REST API Sanctum, Multi-Tenant POS, Kasir Terminal, Dashboard Owner, Akun Klien `/client`, Portal Internal `/portal`, serta alur langganan siap integrasi Midtrans).
+- `app-pos/` — Aplikasi Backend Laravel 13 (REST API Sanctum, Multi-Tenant POS, Kasir Terminal, Dashboard Owner & Verifikasi Super Admin, Akun Klien `/client`, serta alur langganan siap integrasi Midtrans).
 - `pos_mobile_app/` — Source code aplikasi mobile kasir berbasis Flutter.
 - `PRD_Aplikasi_POS.md` — Spesifikasi produk POS SaaS v1.0.
-- `PRD_Layanan_POS_Custom_dan_Deploy_One_Click.md` — Spesifikasi layanan custom, Payment Gate 100%, dan One-Click Deployment v2.0.
+- `PRD_Layanan_POS_Custom_dan_Deploy_One_Click.md` — Spesifikasi layanan konsultasi & custom POS v2.0.
 - `DESIGN_SYSTEM.md` — Sistem Desain *Seka Yasa — Warm Javanese Modern Studio (Anti-AI Slop)*.
 - `jalankan-aplikasi.bat` — Pintasan untuk menjalankan server lokal di Windows.
 

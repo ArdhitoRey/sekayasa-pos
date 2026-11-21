@@ -85,27 +85,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/consultations', [\App\Http\Controllers\Api\ClientAccountController::class, 'requestConsultation']);
         Route::post('/uat/{testCaseId}', [\App\Http\Controllers\Api\ClientAccountController::class, 'submitOwnUat']);
     });
-});
 
-/*
-|--------------------------------------------------------------------------
-| PRD v2: Portal Internal Layanan Custom & One-Click Deployment (Bab 7 & 10)
-|--------------------------------------------------------------------------
-*/
-Route::prefix('portal')->group(function () {
-    Route::get('/leads', [\App\Http\Controllers\Api\PortalController::class, 'index']);
-    Route::post('/leads', [\App\Http\Controllers\Api\PortalController::class, 'store']);
-    Route::get('/leads/{id}', [\App\Http\Controllers\Api\PortalController::class, 'show']);
-    Route::post('/leads/{id}/status', [\App\Http\Controllers\Api\PortalController::class, 'updateStatus']);
-    Route::post('/contracts/{id}/verify-payment', [\App\Http\Controllers\Api\PortalController::class, 'verifyPayment']);
-    Route::post('/uat/{id}', [\App\Http\Controllers\Api\PortalController::class, 'submitUat']);
-    Route::get('/subscription-payments', [\App\Http\Controllers\Api\PortalController::class, 'listSubscriptionPayments']);
-    Route::post('/subscription-payments/{id}/verify', [\App\Http\Controllers\Api\PortalController::class, 'verifySubscriptionPayment']);
-});
-
-Route::prefix('deployment')->group(function () {
-    Route::get('/{leadId}/prechecks', [\App\Http\Controllers\Api\DeploymentController::class, 'validatePreChecks']);
-    Route::post('/{leadId}/deploy-staging', [\App\Http\Controllers\Api\DeploymentController::class, 'deployStaging']);
-    Route::post('/{leadId}/deploy-production', [\App\Http\Controllers\Api\DeploymentController::class, 'deployProduction']);
-    Route::post('/runs/{id}/rollback', [\App\Http\Controllers\Api\DeploymentController::class, 'rollback']);
+    // Super Admin Platform Management (Verifikasi Langganan & Pantau Konsultasi)
+    Route::prefix('admin')->group(function () {
+        Route::get('/platform-overview', [\App\Http\Controllers\Api\AdminController::class, 'overview']);
+        Route::post('/subscription-payments/{id}/verify', [\App\Http\Controllers\Api\AdminController::class, 'verifySubscriptionPayment']);
+    });
 });

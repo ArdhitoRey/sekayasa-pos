@@ -10,7 +10,7 @@
         <div class="sy-index text-[#F7B05F] mb-3">01 / Widget Konsultasi & Pemetaan Awal</div>
         <h1 class="sy-h1 max-w-3xl">Rangkum Kebutuhan Sistem Kasir Anda dalam Tiga Langkah</h1>
         <p class="mt-4 text-[1.05rem] leading-[1.7] text-[#C4B5A2] max-w-[680px]">
-            Pilih profil usaha, skala outlet, dan kendala utama di lapangan untuk menghasilkan ringkasan konsultasi otomatis serta mencatat proyek Anda di Portal Internal.
+            Pilih profil usaha, skala outlet, dan kendala utama di lapangan untuk menghasilkan ringkasan konsultasi otomatis melalui halaman akun Anda.
         </p>
     </div>
 </section>

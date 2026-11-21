@@ -35,8 +35,8 @@
                     <a href="/contact" class="px-6 py-3.5 rounded-md bg-[#F7B05F] hover:bg-[#E89E4A] text-[#1A1208] text-sm font-bold transition">
                         Konsultasi Kebutuhan Usaha
                     </a>
-                    <a href="/portal" class="px-6 py-3.5 rounded-md border border-[rgba(247,176,95,0.35)] hover:border-[#F7B05F] text-[#F7F3EC] text-sm font-semibold transition">
-                        Lihat Portal & Console Deploy
+                    <a href="/projects" class="px-6 py-3.5 rounded-md border border-[rgba(247,176,95,0.35)] hover:border-[#F7B05F] text-[#F7F3EC] text-sm font-semibold transition">
+                        Lihat Bedah Karya Sistem
                     </a>
                 </div>
             </div>
@@ -304,42 +304,42 @@
         <div class="sy-showcase pt-12 border-t border-[rgba(119,82,41,0.18)]">
             <div class="sy-showcase-media bg-[#1A1208] border border-[rgba(247,176,95,0.22)] rounded-lg p-6 text-[#F7F3EC]">
                 <div class="flex justify-between items-center pb-3 mb-4 border-b border-[rgba(247,176,95,0.18)] text-xs font-semibold text-[#F7B05F]">
-                    <span>PORTAL INTERNAL • ONE-CLICK DEPLOYMENT CONSOLE</span>
-                    <span class="font-mono text-[#C4B5A2]">TARGET: PRODUCTION VPS</span>
+                    <span>PORTAL AKUN KLIEN • SEWA VS KONSULTASI CUSTOM</span>
+                    <span class="font-mono text-[#C4B5A2]">TERISOLASI PER AKUN</span>
                 </div>
                 <div class="space-y-2 text-xs font-mono">
                     <div class="p-2.5 bg-[#23190D] border border-[rgba(247,176,95,0.16)] rounded flex justify-between">
-                        <span>[GATE 1] Verifikasi Pembayaran Development 100%</span>
-                        <span class="text-[#F7B05F]">PASS</span>
+                        <span>[JALUR A] Sewa Paket Template POS Standar</span>
+                        <span class="text-[#F7B05F]">AKTIVASI</span>
                     </div>
                     <div class="p-2.5 bg-[#23190D] border border-[rgba(247,176,95,0.16)] rounded flex justify-between">
-                        <span>[GATE 2] Client UAT Sign-off & BAST Tertulis</span>
-                        <span class="text-[#F7B05F]">PASS</span>
+                        <span>[JALUR B] Ajukan Konsultasi Proses Bisnis Custom</span>
+                        <span class="text-[#F7B05F]">DISCOVERY</span>
                     </div>
                     <div class="p-2.5 bg-[#23190D] border border-[rgba(247,176,95,0.16)] rounded flex justify-between">
-                        <span>[GATE 3] Pre-Migration Database Snapshot Backup</span>
-                        <span class="text-[#F7B05F]">PASS</span>
+                        <span>[UAT] Pengujian & Sign-off Klien (Pass / Fail)</span>
+                        <span class="text-[#F7B05F]">TERCATAT</span>
                     </div>
                     <div class="p-3 bg-black/50 border border-[rgba(247,176,95,0.16)] rounded text-[11px] text-[#C4B5A2]">
-                        <div>&gt; php artisan migrate --force && php artisan optimize</div>
-                        <div class="text-[#F7B05F] mt-1">&gt; Health Check /up: HTTP 200 OK (42ms) — Aplikasi Live.</div>
+                        <div>&gt; Akun Klien Terverifikasi: Mengakses /pos & /dashboard</div>
+                        <div class="text-[#F7B05F] mt-1">&gt; Konsultasi Custom: Jadwal Discovery & Proposal SOW Tersimpan.</div>
                     </div>
                 </div>
             </div>
 
             <div class="sy-showcase-copy">
-                <h3 class="sy-h2 text-[#1A1208]">Portal Internal Pengelolaan Proyek & Deploy Satu Tombol</h3>
+                <h3 class="sy-h2 text-[#1A1208]">Halaman Akun Klien untuk Sewa Layanan & Konsultasi Custom</h3>
                 <p class="mt-4 sy-body-point text-[#524538]">
-                    Mengunci pengerjaan development sebelum pembayaran 100% terverifikasi, melacak UAT klien, dan menjalankan deployment staging maupun produksi dengan pengaman pre-check serta rollback.
+                    Setiap calon klien wajib masuk atau mendaftar akun terlebih dahulu untuk menyewa paket POS standar atau mengajukan konsultasi khusus apabila alur usahanya berbeda dari template.
                 </p>
                 <div class="mt-5 flex flex-wrap gap-2">
-                    <span class="px-3 py-1.5 bg-[#FAF7F2] border border-[rgba(119,82,41,0.22)] text-[#775229] text-xs font-semibold rounded-[8px]">Payment Gate 100%</span>
-                    <span class="px-3 py-1.5 bg-[#FAF7F2] border border-[rgba(119,82,41,0.22)] text-[#775229] text-xs font-semibold rounded-[8px]">7 Pre-Deploy Checks</span>
-                    <span class="px-3 py-1.5 bg-[#FAF7F2] border border-[rgba(119,82,41,0.22)] text-[#775229] text-xs font-semibold rounded-[8px]">Auto Rollback</span>
+                    <span class="px-3 py-1.5 bg-[#FAF7F2] border border-[rgba(119,82,41,0.22)] text-[#775229] text-xs font-semibold rounded-[8px]">Sewa Paket Template</span>
+                    <span class="px-3 py-1.5 bg-[#FAF7F2] border border-[rgba(119,82,41,0.22)] text-[#775229] text-xs font-semibold rounded-[8px]">Konsultasi Custom</span>
+                    <span class="px-3 py-1.5 bg-[#FAF7F2] border border-[rgba(119,82,41,0.22)] text-[#775229] text-xs font-semibold rounded-[8px]">Pelacakan UAT Klien</span>
                 </div>
                 <div class="mt-7">
-                    <a href="/portal" class="inline-block pb-1 text-sm font-bold text-[#1A1208] border-b-[1.5px] border-[#775229] hover:text-[#775229] transition">
-                        Buka Portal Layanan & Deploy Console →
+                    <a href="/client" class="inline-block pb-1 text-sm font-bold text-[#1A1208] border-b-[1.5px] border-[#775229] hover:text-[#775229] transition">
+                        Buka Halaman Akun Klien →
                     </a>
                 </div>
             </div>
