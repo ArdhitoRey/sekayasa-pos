@@ -58,7 +58,10 @@
 
             <div class="flex items-center justify-between pt-2">
                 <div class="leading-tight">
-                    <div class="text-xs font-bold text-[#F7F3EC] truncate max-w-[140px]" x-text="user.name"></div>
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-xs font-bold text-[#F7F3EC] truncate max-w-[110px]" x-text="user.name"></span>
+                        <span class="text-[8px] font-bold uppercase px-1 py-0.5 bg-[#F7B05F] text-[#1A1208] rounded">Login</span>
+                    </div>
                     <span class="text-[10px] text-[#C4B5A2] uppercase font-semibold" x-text="user.role"></span>
                 </div>
                 <button @click="logout()" class="p-1.5 text-[#C4B5A2] hover:text-rose-400 rounded transition" title="Logout">

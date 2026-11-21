@@ -25,6 +25,26 @@
         </div>
 
         <div class="p-8">
+            <!-- Already Logged In Panel -->
+            <div x-show="alreadyLoggedIn" class="mb-6 p-4 bg-[#1A1208] text-[#F7F3EC] rounded-md border border-[rgba(247,176,95,0.4)] space-y-3" x-cloak>
+                <div class="flex items-center justify-between">
+                    <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-[#F7B05F] text-[#1A1208] rounded">Sedang Login</span>
+                    <span class="text-[11px] font-mono text-[#C4B5A2]" x-text="currentUser.role ? currentUser.role.toUpperCase() : ''"></span>
+                </div>
+                <div>
+                    <div class="text-sm font-bold" x-text="currentUser.name"></div>
+                    <div class="text-xs text-[#C4B5A2]" x-text="currentUser.email + (currentUser.business ? ' • ' + currentUser.business.name : '')"></div>
+                </div>
+                <div class="flex flex-wrap gap-2 pt-1">
+                    <a :href="redirectTarget || '/client'" class="flex-1 py-2 px-3 bg-[#F7B05F] hover:bg-[#E89E4A] text-[#1A1208] rounded text-xs font-bold text-center transition">
+                        Lanjutkan Sesi →
+                    </a>
+                    <button type="button" @click="logoutCurrent()" class="py-2 px-3 bg-[#23190D] border border-[rgba(247,176,95,0.3)] text-[#C4B5A2] hover:text-rose-300 rounded text-xs font-semibold transition">
+                        Keluar / Ganti Akun
+                    </button>
+                </div>
+            </div>
+
             <!-- Tabs: Login vs Register -->
             <div class="flex border-b border-[rgba(119,82,41,0.18)] mb-6">
                 <button @click="tab = 'login'" :class="tab === 'login' ? 'border-[#775229] text-[#1A1208] font-bold' : 'border-transparent text-[#524538] hover:text-[#1A1208]'" class="flex-1 py-2 text-center border-b-2 text-sm transition">
@@ -124,6 +144,17 @@ function authPage() {
     return {
         tab: params.get('tab') === 'register' ? 'register' : 'login',
         redirectTarget: params.get('redirect') || '',
+        existingToken: localStorage.getItem('pos_token') || '',
+        currentUser: JSON.parse(localStorage.getItem('pos_user') || '{}'),
+        get alreadyLoggedIn() {
+            return Boolean(this.existingToken && this.currentUser && this.currentUser.id);
+        },
+        logoutCurrent() {
+            localStorage.removeItem('pos_token');
+            localStorage.removeItem('pos_user');
+            this.existingToken = '';
+            this.currentUser = {};
+        },
         loading: false,
         loginData: { email: 'klien@usaha.id', password: 'password123' },
         regData: { business_name: '', owner_name: '', email: '', password: '' },
@@ -180,7 +211,7 @@ function authPage() {
                         text: 'Silakan pilih sewa layanan template POS atau ajukan konsultasi custom di halaman akun Anda.',
                         confirmButtonColor: '#775229',
                     }).then(() => {
-                        window.location.href = '/client';
+                        window.location.href = this.redirectTarget || '/client';
                     });
                 } else {
                     Swal.fire({ icon: 'error', title: 'Registrasi Gagal', text: result.message || 'Data tidak valid', confirmButtonColor: '#775229' });

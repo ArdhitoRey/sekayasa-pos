@@ -13,8 +13,11 @@
                     SY
                 </a>
                 <div>
-                    <div class="text-[11px] font-semibold text-[#F7B05F] tracking-wider uppercase">00 / Halaman Akun Klien</div>
-                    <h1 class="text-base font-bold text-[#F7F3EC] leading-tight">
+                    <div class="flex items-center gap-2">
+                        <span class="text-[11px] font-semibold text-[#F7B05F] tracking-wider uppercase">00 / Halaman Akun Klien</span>
+                        <span class="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-[#F7B05F] text-[#1A1208] rounded">Sedang Login</span>
+                    </div>
+                    <h1 class="text-base font-bold text-[#F7F3EC] leading-tight mt-0.5">
                         <span x-text="user.name || 'Akun Klien'"></span> — <span class="text-[#C4B5A2]" x-text="business.name || ''"></span>
                     </h1>
                 </div>

@@ -175,40 +175,86 @@
     <div id="scroll-progress"></div>
 
     <!-- Navbar (Deep Espresso #1A1208) -->
-    <header class="sticky top-0 z-50 bg-[#1A1208]/95 backdrop-blur border-b border-[rgba(247,176,95,0.14)]">
-        <div class="sy-container h-20 flex items-center justify-between">
-            <a href="/" class="flex items-center gap-3 group">
-                <!-- Minimal Javanese Geometric Mark -->
-                <svg class="w-8 h-8 text-[#F7B05F]" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect x="4" y="4" width="32" height="32" rx="4" stroke="currentColor" stroke-width="2"/>
-                    <path d="M20 9L31 20L20 31L9 20L20 9Z" stroke="currentColor" stroke-width="1.75"/>
-                    <circle cx="20" cy="20" r="3.5" fill="currentColor"/>
-                </svg>
-                <div>
-                    <span class="block text-base font-bold tracking-tight text-[#F7F3EC] leading-none">SEKA YASA</span>
-                    <span class="block text-[11px] font-medium text-[#C4B5A2] tracking-wider uppercase mt-1">POS Custom Studio</span>
+    <div x-data="siteHeaderAuth()" x-init="initAuth()">
+        <header class="sticky top-0 z-50 bg-[#1A1208]/95 backdrop-blur border-b border-[rgba(247,176,95,0.14)]">
+            <div class="sy-container h-20 flex items-center justify-between gap-4">
+                <a href="/" class="flex items-center gap-3 group shrink-0">
+                    <!-- Minimal Javanese Geometric Mark -->
+                    <svg class="w-8 h-8 text-[#F7B05F]" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="4" y="4" width="32" height="32" rx="4" stroke="currentColor" stroke-width="2"/>
+                        <path d="M20 9L31 20L20 31L9 20L20 9Z" stroke="currentColor" stroke-width="1.75"/>
+                        <circle cx="20" cy="20" r="3.5" fill="currentColor"/>
+                    </svg>
+                    <div>
+                        <span class="block text-base font-bold tracking-tight text-[#F7F3EC] leading-none">SEKA YASA</span>
+                        <span class="block text-[11px] font-medium text-[#C4B5A2] tracking-wider uppercase mt-1">POS Custom Studio</span>
+                    </div>
+                </a>
+
+                <!-- Main Nav Links -->
+                <nav class="hidden md:flex items-center gap-8 text-sm font-medium">
+                    <a href="/" class="{{ request()->is('/') ? 'text-[#F7B05F] font-semibold' : 'text-[#C4B5A2] hover:text-[#F7F3EC]' }} transition">Beranda</a>
+                    <a href="/projects" class="{{ request()->is('projects') ? 'text-[#F7B05F] font-semibold' : 'text-[#C4B5A2] hover:text-[#F7F3EC]' }} transition">Karya Sistem</a>
+                    <a href="/about" class="{{ request()->is('about') ? 'text-[#F7B05F] font-semibold' : 'text-[#C4B5A2] hover:text-[#F7F3EC]' }} transition">Tentang</a>
+                    <a href="/contact" class="{{ request()->is('contact') ? 'text-[#F7B05F] font-semibold' : 'text-[#C4B5A2] hover:text-[#F7F3EC]' }} transition">Konsultasi</a>
+                </nav>
+
+                <!-- Dynamic Auth State: Guest vs Logged-In Identity -->
+                <div class="flex items-center gap-3">
+                    <!-- Guest Buttons -->
+                    <template x-if="!isLoggedIn">
+                        <div class="flex items-center gap-2.5">
+                            <a href="/login?redirect=/contact" class="hidden sm:inline-flex items-center px-3.5 py-2 rounded-md border border-[rgba(247,176,95,0.28)] text-xs font-semibold text-[#F7F3EC] hover:border-[#F7B05F] hover:text-[#F7B05F] transition">
+                                Konsultasi
+                            </a>
+                            <a href="/login?redirect=/client" class="inline-flex items-center px-4 py-2 rounded-md bg-[#F7B05F] hover:bg-[#E89E4A] text-[#1A1208] text-xs font-bold transition">
+                                Masuk / Daftar
+                            </a>
+                        </div>
+                    </template>
+
+                    <!-- Logged-In Design -->
+                    <template x-if="isLoggedIn">
+                        <div class="flex items-center gap-2.5">
+                            <div class="hidden sm:flex items-center gap-2.5 bg-[#23190D] border border-[rgba(247,176,95,0.42)] px-3 py-1.5 rounded-md">
+                                <div class="w-6 h-6 rounded bg-[#F7B05F] text-[#1A1208] text-xs font-bold flex items-center justify-center shrink-0" x-text="userInitial"></div>
+                                <div class="leading-tight">
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="text-xs font-bold text-[#F7F3EC] max-w-[140px] truncate" x-text="user.name || 'Pengguna'"></span>
+                                        <span class="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-[#F7B05F]/20 text-[#F7B05F] border border-[#F7B05F]/30 rounded">Sedang Login</span>
+                                    </div>
+                                    <div class="text-[10px] text-[#C4B5A2] max-w-[180px] truncate" x-text="(user.business ? user.business.name : '') + (user.role ? ' • ' + user.role.toUpperCase() : '')"></div>
+                                </div>
+                            </div>
+                            <a href="/client" class="px-3.5 py-2 rounded-md bg-[#F7B05F] hover:bg-[#E89E4A] text-[#1A1208] text-xs font-bold transition">
+                                Akun Saya
+                            </a>
+                            <button type="button" @click="logout()" class="px-3 py-2 rounded-md border border-[rgba(247,176,95,0.25)] text-xs font-semibold text-[#C4B5A2] hover:text-rose-300 hover:border-rose-400/50 transition">
+                                Keluar
+                            </button>
+                        </div>
+                    </template>
                 </div>
-            </a>
+            </div>
+        </header>
 
-            <!-- Main Nav Links -->
-            <nav class="hidden md:flex items-center gap-8 text-sm font-medium">
-                <a href="/" class="{{ request()->is('/') ? 'text-[#F7B05F] font-semibold' : 'text-[#C4B5A2] hover:text-[#F7F3EC]' }} transition">Beranda</a>
-                <a href="/projects" class="{{ request()->is('projects') ? 'text-[#F7B05F] font-semibold' : 'text-[#C4B5A2] hover:text-[#F7F3EC]' }} transition">Karya Sistem</a>
-                <a href="/about" class="{{ request()->is('about') ? 'text-[#F7B05F] font-semibold' : 'text-[#C4B5A2] hover:text-[#F7F3EC]' }} transition">Tentang</a>
-                <a href="/contact" class="{{ request()->is('contact') ? 'text-[#F7B05F] font-semibold' : 'text-[#C4B5A2] hover:text-[#F7F3EC]' }} transition">Konsultasi</a>
-            </nav>
-
-            <!-- Operational Entry Points -->
-            <div class="flex items-center gap-3">
-                <a href="/client" class="hidden sm:inline-flex items-center gap-2 px-3.5 py-2 rounded-md border border-[rgba(247,176,95,0.28)] text-xs font-semibold text-[#F7F3EC] hover:border-[#F7B05F] hover:text-[#F7B05F] transition">
-                    Akun & Konsultasi
-                </a>
-                <a href="/login?redirect=/client" class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-[#F7B05F] hover:bg-[#E89E4A] text-[#1A1208] text-xs font-bold transition">
-                    Masuk / Daftar Sewa
-                </a>
+        <!-- Active Session Strip (Visible on Public Pages when Logged In) -->
+        <div x-show="isLoggedIn" class="bg-[#23190D] border-b border-[rgba(247,176,95,0.2)] text-xs text-[#C4B5A2]" x-cloak>
+            <div class="sy-container py-2 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                    <span class="text-[#F7B05F] font-bold uppercase text-[10px] tracking-wider mr-2">[SESI AKTIF]</span>
+                    Anda sedang login sebagai <b class="text-[#F7F3EC]" x-text="user.name"></b>
+                    <span x-show="user.business"> (<span x-text="user.business ? user.business.name : ''"></span>)</span>.
+                </div>
+                <div class="flex items-center gap-4 font-semibold text-[11px]">
+                    <a href="/client" class="text-[#F7B05F] hover:underline">Halaman Akun & Sewa</a>
+                    <a href="/contact" class="text-[#F7F3EC] hover:text-[#F7B05F]">Konsultasi Custom</a>
+                    <a x-show="user.role !== 'owner' || (user.business && user.business.service_type === 'template_saas')" href="/pos" class="text-[#F7F3EC] hover:text-[#F7B05F]">Layar Kasir POS</a>
+                    <a x-show="user.role === 'superadmin' || user.role === 'admin' || (user.business && user.business.service_type === 'template_saas')" href="/dashboard" class="text-[#F7F3EC] hover:text-[#F7B05F]">Dashboard</a>
+                </div>
             </div>
         </div>
-    </header>
+    </div>
 
     <main>
         @yield('content')
@@ -244,6 +290,54 @@
     </footer>
 
     <script>
+        function siteHeaderAuth() {
+            return {
+                token: localStorage.getItem('pos_token') || '',
+                user: JSON.parse(localStorage.getItem('pos_user') || '{}'),
+                get isLoggedIn() {
+                    return Boolean(this.token && this.user && this.user.id);
+                },
+                get userInitial() {
+                    return this.user && this.user.name ? this.user.name.charAt(0).toUpperCase() : 'U';
+                },
+                async initAuth() {
+                    if (!this.token) return;
+                    try {
+                        const res = await fetch('/api/me', {
+                            headers: { 'Authorization': `Bearer ${this.token}`, 'Accept': 'application/json' },
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data.status === 'success') {
+                                this.user = data.data;
+                                localStorage.setItem('pos_user', JSON.stringify(data.data));
+                            }
+                        } else if (res.status === 401) {
+                            this.clearSession();
+                        }
+                    } catch (e) {}
+                },
+                clearSession() {
+                    this.token = '';
+                    this.user = {};
+                    localStorage.removeItem('pos_token');
+                    localStorage.removeItem('pos_user');
+                },
+                async logout() {
+                    if (this.token) {
+                        try {
+                            await fetch('/api/logout', {
+                                method: 'POST',
+                                headers: { 'Authorization': `Bearer ${this.token}`, 'Accept': 'application/json' },
+                            });
+                        } catch (e) {}
+                    }
+                    this.clearSession();
+                    window.location.href = '/login';
+                }
+            };
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             if (window.lucide) {
                 window.lucide.createIcons();

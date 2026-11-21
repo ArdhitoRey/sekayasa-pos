@@ -17,6 +17,7 @@
                     <span x-text="currentOutlet.name || 'Outlet Utama'"></span>
                     <span class="text-[#775229]">•</span>
                     <span x-text="user.name || 'Kasir'"></span>
+                    <span class="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-[#F7B05F] text-[#1A1208] rounded">Sedang Login</span>
                 </div>
             </div>
         </div>
