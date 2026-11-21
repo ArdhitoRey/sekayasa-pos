@@ -8,7 +8,6 @@ use App\Models\Consultation;
 use App\Models\Plan;
 use App\Models\SubscriptionPayment;
 use App\Models\UatTestCase;
-use App\Services\QrisService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -16,7 +15,7 @@ use Illuminate\Support\Str;
 class ClientAccountController extends Controller
 {
     /**
-     * Client Account Overview: Profile, Available Template Plans, Active QRIS Invoices, and Custom Consultations
+     * Client Account Overview: Profile, Available Template Plans, Active Subscription Invoices, and Custom Consultations
      */
     public function overview(Request $request)
     {
@@ -70,17 +69,13 @@ class ClientAccountController extends Controller
                 'pending_payment' => $pendingPayment,
                 'payment_history' => $paymentHistory,
                 'projects' => $projects,
-                'qris_merchant' => [
-                    'name' => QrisService::MERCHANT_NAME,
-                    'nmid' => QrisService::MERCHANT_NMID,
-                ],
             ],
         ]);
     }
 
     /**
-     * Path A: Create Dynamic QRIS Payment Invoice to Rent Standard POS Template
-     * Nominal = Plan Monthly Price + Unique 3-Digit Code so incoming funds can be auto-detected.
+     * Path A: Create Subscription Invoice to Rent Standard POS Template
+     * (Midtrans Payment Gateway integration is pending merchant approval; verified via Portal Admin in the meantime)
      */
     public function rentTemplate(Request $request)
     {
@@ -100,61 +95,38 @@ class ClientAccountController extends Controller
         $business = $user->business;
 
         return DB::transaction(function () use ($business, $plan) {
-            // Cancel older pending invoices for this business to avoid stale duplicates
             SubscriptionPayment::where('business_id', $business->id)
                 ->where('status', 'pending')
-                ->update(['status' => 'rejected', 'notes' => 'Digantikan tagihan QRIS baru']);
+                ->update(['status' => 'rejected', 'notes' => 'Digantikan tagihan langganan baru']);
 
-            $baseAmount = (int) round((float) $plan->price_monthly);
-
-            // Pick a unique 3-digit code not currently in use by any active pending QRIS payment
-            $activeAmounts = SubscriptionPayment::where('status', 'pending')
-                ->where('expires_at', '>', now())
-                ->pluck('amount')
-                ->map(fn ($a) => (int) round((float) $a))
-                ->toArray();
-
-            $uniqueCode = random_int(101, 999);
-            $attempts = 0;
-            while (in_array($baseAmount + $uniqueCode, $activeAmounts, true) && $attempts < 50) {
-                $uniqueCode = random_int(101, 999);
-                $attempts++;
-            }
-
-            $totalAmount = $baseAmount + $uniqueCode;
-            $qrisPayload = QrisService::generateDynamic($totalAmount);
+            $amount = (int) round((float) $plan->price_monthly);
             $invoiceNumber = 'SUB-' . date('Ymd') . '-' . strtoupper(Str::random(5));
 
             $payment = SubscriptionPayment::create([
                 'business_id' => $business->id,
                 'plan_id' => $plan->id,
                 'invoice_number' => $invoiceNumber,
-                'base_amount' => $baseAmount,
-                'unique_code' => $uniqueCode,
-                'amount' => $totalAmount,
-                'payment_method' => 'qris_dynamic',
-                'qris_payload' => $qrisPayload,
+                'base_amount' => $amount,
+                'unique_code' => 0,
+                'amount' => $amount,
+                'payment_method' => 'midtrans_pending',
                 'status' => 'pending',
-                'notes' => "Tagihan sewa Paket {$plan->name} (Kode unik {$uniqueCode})",
-                'expires_at' => now()->addMinutes(30),
+                'notes' => "Tagihan sewa Paket {$plan->name} (Integrasi Midtrans dalam pengajuan — verifikasi admin)",
+                'expires_at' => now()->addDays(1),
             ]);
 
             return response()->json([
                 'status' => 'success',
-                'message' => "Tagihan QRIS Dinamis dibuat sebesar Rp " . number_format($totalAmount, 0, ',', '.') . ". Silakan scan untuk aktivasi otomatis.",
+                'message' => "Tagihan langganan {$invoiceNumber} sebesar Rp " . number_format($amount, 0, ',', '.') . " berhasil dibuat. Menunggu pembayaran/verifikasi.",
                 'data' => [
                     'payment' => $payment->load('plan'),
-                    'merchant' => [
-                        'name' => QrisService::MERCHANT_NAME,
-                        'nmid' => QrisService::MERCHANT_NMID,
-                    ],
                 ],
             ], 201);
         });
     }
 
     /**
-     * Poll QRIS Payment Status for Auto-Detection UI on /client
+     * Poll Subscription Payment Status
      */
     public function checkPaymentStatus(Request $request, $paymentId)
     {

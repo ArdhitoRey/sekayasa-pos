@@ -142,67 +142,49 @@
                         </div>
 
                         <div class="mt-5 flex flex-wrap items-center justify-between gap-4">
-                            <span class="text-xs text-[#524538]">Pembayaran menggunakan <b>QRIS Dinamis</b> (nominal terkunci & terdeteksi otomatis).</span>
+                            <span class="text-xs text-[#524538]">Pembayaran otomatis <b>Midtrans</b> sedang dalam pengajuan (saat ini verifikasi via Admin Portal).</span>
                             <button type="button" @click="rentTemplateAction()" :disabled="submittingRent || !selectedPlanId" class="px-6 py-2.5 bg-[#775229] hover:bg-[#583B1B] text-[#FAF7F2] rounded-md text-xs font-bold transition disabled:opacity-50">
-                                <span x-show="!submittingRent" x-text="pendingPayment ? 'Buat Ulang Tagihan QRIS' : 'Sewa & Bayar via QRIS →'"></span>
-                                <span x-show="submittingRent">Membuat QRIS...</span>
+                                <span x-show="!submittingRent" x-text="pendingPayment ? 'Buat Ulang Tagihan Sewa' : 'Sewa Paket Sekarang →'"></span>
+                                <span x-show="submittingRent">Memproses Tagihan...</span>
                             </button>
                         </div>
 
-                        <!-- DYNAMIC QRIS PAYMENT BOX (Auto-Detection Polling) -->
+                        <!-- SUBSCRIPTION PAYMENT INVOICE BOX (Midtrans Pending) -->
                         <template x-if="pendingPayment">
                             <div class="mt-6 bg-[#FAF7F2] border border-[#775229] rounded-lg overflow-hidden">
                                 <div class="bg-[#1A1208] text-[#F7F3EC] px-5 py-3 flex flex-wrap items-center justify-between gap-2">
                                     <div>
-                                        <span class="text-[10px] font-bold text-[#F7B05F] uppercase tracking-wider">Tagihan QRIS Menunggu Pembayaran</span>
+                                        <span class="text-[10px] font-bold text-[#F7B05F] uppercase tracking-wider">Tagihan Langganan Menunggu Pembayaran / Verifikasi</span>
                                         <div class="text-xs font-mono" x-text="pendingPayment.invoice_number"></div>
                                     </div>
-                                    <span class="text-xs font-semibold text-[#F7B05F]">Mendeteksi otomatis setiap 3 detik</span>
+                                    <span class="text-xs font-semibold text-[#F7B05F]">Status: Pending</span>
                                 </div>
 
-                                <div class="p-5 grid grid-cols-1 md:grid-cols-[210px_1fr] gap-6 items-center">
-                                    <!-- QR Code Render Container -->
-                                    <div class="bg-white p-3 border border-[rgba(119,82,41,0.25)] rounded flex flex-col items-center justify-center mx-auto">
-                                        <div id="dynamic-qris-box" class="w-[180px] h-[180px] flex items-center justify-center"></div>
-                                        <span class="text-[10px] font-mono text-[#524538] mt-2 text-center" x-text="'NMID: ' + (qrisMerchant.nmid || 'ID1026599048299')"></span>
+                                <div class="p-5 space-y-4 text-xs">
+                                    <div class="bg-[#F3EDE4] p-4 rounded border border-[rgba(119,82,41,0.2)] space-y-2">
+                                        <div class="flex justify-between text-[#524538]">
+                                            <span>Paket Dipilih:</span>
+                                            <b x-text="pendingPayment.plan ? pendingPayment.plan.name : '-'"></b>
+                                        </div>
+                                        <div class="flex justify-between text-[#524538]">
+                                            <span>Metode Pembayaran:</span>
+                                            <span class="font-semibold text-[#1A1208]">Midtrans (Dalam Pengajuan) / Konfirmasi Admin</span>
+                                        </div>
+                                        <div class="pt-2 border-t border-[rgba(119,82,41,0.18)] flex justify-between items-baseline">
+                                            <span class="font-bold text-[#1A1208]">Total Tagihan:</span>
+                                            <span class="text-lg font-bold font-mono text-[#775229]" x-text="formatRupiah(pendingPayment.amount)"></span>
+                                        </div>
                                     </div>
 
-                                    <!-- Payment Details & Exact Locked Nominal -->
-                                    <div class="space-y-3 text-xs">
-                                        <div>
-                                            <span class="text-[10px] font-bold text-[#775229] uppercase">Merchant Penerima QRIS</span>
-                                            <div class="text-sm font-bold text-[#1A1208]" x-text="qrisMerchant.name || 'MUHHAMAD SATRIA RAMADHAN, DIGITAL & KREATIF'"></div>
-                                        </div>
+                                    <p class="text-[11px] text-[#524538] leading-relaxed">
+                                        Integrasi payment gateway <b>Midtrans</b> sedang dalam tahap pengajuan. Setelah pembayaran dikonfirmasi/diverifikasi oleh Admin melalui Portal Internal, layanan kasir POS (`/pos`) dan dashboard (`/dashboard`) akan otomatis aktif di akun Anda.
+                                    </p>
 
-                                        <div class="bg-[#F3EDE4] p-3.5 rounded border border-[rgba(119,82,41,0.2)] space-y-1.5">
-                                            <div class="flex justify-between text-[#524538]">
-                                                <span>Paket Dipilih:</span>
-                                                <b x-text="pendingPayment.plan ? pendingPayment.plan.name : '-'"></b>
-                                            </div>
-                                            <div class="flex justify-between text-[#524538]">
-                                                <span>Harga Paket:</span>
-                                                <span class="font-mono" x-text="formatRupiah(pendingPayment.base_amount)"></span>
-                                            </div>
-                                            <div class="flex justify-between text-[#524538]">
-                                                <span>Kode Unik Verifikasi:</span>
-                                                <span class="font-mono font-bold text-[#775229]" x-text="'+' + pendingPayment.unique_code"></span>
-                                            </div>
-                                            <div class="pt-2 border-t border-[rgba(119,82,41,0.18)] flex justify-between items-baseline">
-                                                <span class="font-bold text-[#1A1208]">Total Nominal Terkunci:</span>
-                                                <span class="text-lg font-bold font-mono text-[#775229]" x-text="formatRupiah(pendingPayment.amount)"></span>
-                                            </div>
-                                        </div>
-
-                                        <p class="text-[11px] text-[#524538] leading-relaxed">
-                                            Nominal di atas sudah ditanamkan langsung di dalam QRIS. Saat Anda scan menggunakan GoPay, BCA Mobile, DANA, OVO, atau ShopeePay, nominal otomatis terisi dan tidak bisa diubah. Sistem akan mengaktifkan akun POS Anda segera setelah uang masuk.
-                                        </p>
-
-                                        <div class="flex items-center gap-3 pt-1">
-                                            <button type="button" @click="manualCheckPayment()" class="px-3.5 py-1.5 bg-[#F2EBE1] hover:bg-[#F3EDE4] border border-[rgba(119,82,41,0.25)] text-[#775229] rounded font-bold transition">
-                                                Cek Status Sekarang
-                                            </button>
-                                            <span class="text-[11px] text-[#524538]" x-text="'Berlaku hingga: ' + formatDate(pendingPayment.expires_at)"></span>
-                                        </div>
+                                    <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
+                                        <button type="button" @click="manualCheckPayment()" class="px-4 py-2 bg-[#F2EBE1] hover:bg-[#F3EDE4] border border-[rgba(119,82,41,0.25)] text-[#775229] rounded font-bold transition">
+                                            Cek Status Pembayaran
+                                        </button>
+                                        <span class="text-[11px] text-[#524538]" x-text="'Berlaku hingga: ' + formatDate(pendingPayment.expires_at)"></span>
                                     </div>
                                 </div>
                             </div>
@@ -400,7 +382,6 @@ function clientPortalApp() {
         projects: [],
         pendingPayment: null,
         paymentHistory: [],
-        qrisMerchant: {},
         pollTimer: null,
         selectedPlanId: null,
         submittingRent: false,
@@ -458,14 +439,12 @@ function clientPortalApp() {
                     this.projects = result.data.projects || [];
                     this.pendingPayment = result.data.pending_payment || null;
                     this.paymentHistory = result.data.payment_history || [];
-                    this.qrisMerchant = result.data.qris_merchant || {};
                     this.consultForm.phone = this.user.phone || '';
                     if (this.plans.length > 0 && !this.selectedPlanId) {
                         const sub = this.business.current_subscription;
                         this.selectedPlanId = (sub && sub.plan_id) ? sub.plan_id : this.plans[0].id;
                     }
                     if (this.pendingPayment) {
-                        this.$nextTick(() => this.renderQrisCode());
                         this.startPaymentPolling();
                     } else {
                         this.stopPaymentPolling();
@@ -475,22 +454,6 @@ function clientPortalApp() {
                 console.error(err);
             } finally {
                 this.loading = false;
-            }
-        },
-
-        renderQrisCode() {
-            const box = document.getElementById('dynamic-qris-box');
-            if (!box || !this.pendingPayment || !this.pendingPayment.qris_payload) return;
-            box.innerHTML = '';
-            if (window.QRCode) {
-                new window.QRCode(box, {
-                    text: this.pendingPayment.qris_payload,
-                    width: 176,
-                    height: 176,
-                    colorDark: '#1A1208',
-                    colorLight: '#FFFFFF',
-                    correctLevel: window.QRCode.CorrectLevel.M,
-                });
             }
         },
 
@@ -524,8 +487,8 @@ function clientPortalApp() {
                         this.pendingPayment = null;
                         await Swal.fire({
                             icon: 'success',
-                            title: 'Pembayaran QRIS Terdeteksi!',
-                            text: 'Dana telah masuk dengan nominal sesuai. Layanan POS Anda kini aktif.',
+                            title: 'Pembayaran Terverifikasi!',
+                            text: 'Layanan POS Anda kini telah aktif dan siap digunakan.',
                             confirmButtonColor: '#775229',
                         });
                         await this.loadOverview();
@@ -536,8 +499,8 @@ function clientPortalApp() {
                     } else if (showPendingAlert) {
                         Swal.fire({
                             icon: 'info',
-                            title: 'Menunggu Pembayaran',
-                            text: 'Dana belum terdeteksi masuk. Pastikan nominal transfer tepat hingga 3 digit kode unik.',
+                            title: 'Menunggu Verifikasi',
+                            text: 'Tagihan masih berstatus pending. Integrasi Midtrans dalam tahap pengajuan, silakan konfirmasi ke Admin Portal.',
                             confirmButtonColor: '#775229',
                         });
                     }
@@ -563,8 +526,6 @@ function clientPortalApp() {
                 const result = await res.json();
                 if (res.ok) {
                     this.pendingPayment = result.data.payment;
-                    this.qrisMerchant = result.data.merchant || {};
-                    this.$nextTick(() => this.renderQrisCode());
                     this.startPaymentPolling();
                 } else {
                     Swal.fire({ icon: 'error', title: 'Gagal', text: result.message, confirmButtonColor: '#775229' });

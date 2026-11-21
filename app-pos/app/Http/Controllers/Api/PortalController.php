@@ -6,9 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\ClientLead;
 use App\Models\Consultation;
 use App\Models\DiscoverySession;
+use App\Models\Outlet;
 use App\Models\ProjectContract;
 use App\Models\ProjectRequirement;
 use App\Models\Proposal;
+use App\Models\Subscription;
+use App\Models\SubscriptionPayment;
 use App\Models\UatTestCase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -215,5 +218,77 @@ class PortalController extends Controller
             'message' => 'Hasil UAT berhasil dicatat',
             'data' => $testCase,
         ]);
+    }
+
+    /**
+     * List Subscription Payments (Midtrans Pending / Manual Verification)
+     */
+    public function listSubscriptionPayments()
+    {
+        $payments = SubscriptionPayment::with(['business', 'plan'])
+            ->latest()
+            ->limit(30)
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $payments,
+        ]);
+    }
+
+    /**
+     * Verify Subscription Payment manually while Midtrans is in application
+     */
+    public function verifySubscriptionPayment(Request $request, $paymentId)
+    {
+        $payment = SubscriptionPayment::with('business', 'plan')->findOrFail($paymentId);
+
+        if ($payment->status === 'verified') {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Pembayaran ini sudah diverifikasi sebelumnya.',
+                'data' => $payment,
+            ]);
+        }
+
+        return DB::transaction(function () use ($payment, $request) {
+            $payment->update([
+                'status' => 'verified',
+                'verified_at' => now(),
+                'notes' => ($payment->notes ? $payment->notes . ' | ' : '') . 'Diverifikasi Admin Portal (Menunggu aktivasi Midtrans)',
+            ]);
+
+            $business = $payment->business;
+            $subscription = Subscription::updateOrCreate(
+                ['business_id' => $business->id],
+                [
+                    'plan_id' => $payment->plan_id,
+                    'status' => 'active',
+                    'starts_at' => now(),
+                    'expires_at' => now()->addMonth(),
+                ]
+            );
+
+            $payment->update(['subscription_id' => $subscription->id]);
+            $business->update(['service_type' => 'template_saas']);
+
+            if ($business->outlets()->count() === 0) {
+                Outlet::create([
+                    'business_id' => $business->id,
+                    'name' => 'Outlet Utama',
+                    'address' => $business->address ?? 'Pusat',
+                    'is_active' => true,
+                ]);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => "Pembayaran {$payment->invoice_number} berhasil diverifikasi dan layanan POS klien telah diaktifkan.",
+                'data' => [
+                    'payment' => $payment->fresh('business', 'plan'),
+                    'subscription' => $subscription,
+                ],
+            ]);
+        });
     }
 }

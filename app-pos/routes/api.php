@@ -89,13 +89,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
 /*
 |--------------------------------------------------------------------------
-| QRIS Auto-Detection Webhook (MacroDroid / Tasker / Notification Forwarder)
-|--------------------------------------------------------------------------
-*/
-Route::post('/webhooks/qris-mutation', [\App\Http\Controllers\Api\QrisWebhookController::class, 'handleMutation']);
-
-/*
-|--------------------------------------------------------------------------
 | PRD v2: Portal Internal Layanan Custom & One-Click Deployment (Bab 7 & 10)
 |--------------------------------------------------------------------------
 */
@@ -106,7 +99,8 @@ Route::prefix('portal')->group(function () {
     Route::post('/leads/{id}/status', [\App\Http\Controllers\Api\PortalController::class, 'updateStatus']);
     Route::post('/contracts/{id}/verify-payment', [\App\Http\Controllers\Api\PortalController::class, 'verifyPayment']);
     Route::post('/uat/{id}', [\App\Http\Controllers\Api\PortalController::class, 'submitUat']);
-    Route::get('/qris-payments', [\App\Http\Controllers\Api\QrisWebhookController::class, 'listPayments']);
+    Route::get('/subscription-payments', [\App\Http\Controllers\Api\PortalController::class, 'listSubscriptionPayments']);
+    Route::post('/subscription-payments/{id}/verify', [\App\Http\Controllers\Api\PortalController::class, 'verifySubscriptionPayment']);
 });
 
 Route::prefix('deployment')->group(function () {

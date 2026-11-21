@@ -125,26 +125,18 @@
             </div>
         </div>
 
-        <!-- QRIS Subscription Payment Monitor & Auto-Detection Webhook (Bab 4.11 & Merchant QRIS) -->
+        <!-- Subscription Payment Monitor (Midtrans Pending -> Manual Admin Verification) -->
         <div class="bg-[#23190D] border border-[rgba(247,176,95,0.2)] rounded-lg overflow-hidden">
             <div class="px-5 py-3.5 border-b border-[rgba(247,176,95,0.16)] flex flex-wrap justify-between items-center gap-3">
                 <div>
-                    <span class="text-xs font-semibold text-[#F7B05F]">02 / Pemantauan QRIS Dinamis Langganan & Deteksi Otomatis</span>
-                    <div class="text-[11px] text-[#C4B5A2] mt-0.5">Merchant QRIS: <b class="text-[#F7F3EC]" x-text="qrisMeta.merchant_name || 'MUHHAMAD SATRIA RAMADHAN, DIGITAL & KREATIF'"></b> (NMID: <span class="font-mono" x-text="qrisMeta.merchant_nmid || 'ID1026599048299'"></span>)</div>
+                    <span class="text-xs font-semibold text-[#F7B05F]">02 / Verifikasi Pembayaran Langganan (Midtrans Dalam Pengajuan)</span>
+                    <div class="text-[11px] text-[#C4B5A2] mt-0.5">Verifikasi tagihan sewa paket klien sebelum integrasi otomatis Midtrans aktif.</div>
                 </div>
-                <button @click="loadQrisPayments()" class="px-3 py-1 bg-[#1A1208] border border-[rgba(247,176,95,0.25)] text-[#F7B05F] rounded text-xs font-semibold">Muat Ulang</button>
-            </div>
-
-            <!-- Webhook Setup Info -->
-            <div class="p-4 bg-[#1A1208] border-b border-[rgba(247,176,95,0.14)] text-[11px] font-mono text-[#C4B5A2] space-y-1">
-                <div class="text-[#F7B05F] font-bold">ENDPOINT WEBHOOK ANDROID NOTIFICATION FORWARDER (MacroDroid / Tasker / GoPay Merchant):</div>
-                <div>POST <span class="text-[#F7F3EC]" x-text="qrisMeta.webhook_url || '/api/webhooks/qris-mutation'"></span></div>
-                <div>Header: <span class="text-[#F7F3EC]">X-QRIS-WEBHOOK-SECRET: <span x-text="qrisMeta.webhook_secret || 'seka-yasa-qris-2026'"></span></span></div>
-                <div>JSON Body: <span class="text-[#F7F3EC]">{"message": "{notifikasi_gopay_merchant}"}</span> atau <span class="text-[#F7F3EC]">{"amount": 99347}</span></div>
+                <button @click="loadSubscriptionPayments()" class="px-3 py-1 bg-[#1A1208] border border-[rgba(247,176,95,0.25)] text-[#F7B05F] rounded text-xs font-semibold">Muat Ulang</button>
             </div>
 
             <div class="divide-y divide-[rgba(247,176,95,0.12)]">
-                <template x-for="pay in qrisPayments" :key="pay.id">
+                <template x-for="pay in subPayments" :key="pay.id">
                     <div class="p-4 flex flex-wrap items-center justify-between gap-4 text-xs">
                         <div>
                             <div class="font-bold text-[#F7F3EC]">
@@ -152,7 +144,7 @@
                                 — <span x-text="pay.business ? pay.business.name : '-'"></span>
                             </div>
                             <div class="text-[11px] text-[#C4B5A2] mt-0.5">
-                                Paket: <b x-text="pay.plan ? pay.plan.name : '-'"></b> • Kode Unik: <span class="font-mono text-[#F7B05F]" x-text="'+' + pay.unique_code"></span>
+                                Paket: <b x-text="pay.plan ? pay.plan.name : '-'"></b> • Metode: <span class="font-mono" x-text="pay.payment_method"></span>
                             </div>
                         </div>
                         <div class="flex items-center gap-4">
@@ -160,14 +152,14 @@
                                 <div class="text-sm font-bold text-[#F7F3EC]" x-text="formatRupiah(pay.amount)"></div>
                                 <span class="text-[10px] uppercase font-bold" :class="pay.status === 'verified' ? 'text-[#F7B05F]' : 'text-[#C4B5A2]'" x-text="pay.status"></span>
                             </div>
-                            <button x-show="pay.status === 'pending'" @click="simulateQrisWebhook(pay.amount)" class="px-3 py-1.5 bg-[#F7B05F] hover:bg-[#E89E4A] text-[#1A1208] rounded font-bold text-[11px] transition">
-                                Simulasi Uang Masuk
+                            <button x-show="pay.status === 'pending'" @click="verifySubPayment(pay.id)" class="px-3 py-1.5 bg-[#F7B05F] hover:bg-[#E89E4A] text-[#1A1208] rounded font-bold text-[11px] transition">
+                                Verifikasi & Aktifkan
                             </button>
                         </div>
                     </div>
                 </template>
-                <div x-show="qrisPayments.length === 0" class="p-6 text-center text-xs text-[#C4B5A2]">
-                    Belum ada tagihan QRIS langganan. Buat tagihan melalui halaman /client.
+                <div x-show="subPayments.length === 0" class="p-6 text-center text-xs text-[#C4B5A2]">
+                    Belum ada tagihan langganan yang masuk.
                 </div>
             </div>
         </div>
@@ -454,8 +446,7 @@ function portalApp() {
         isDeploying: false,
         terminalLines: [],
         selectedStatus: '',
-        qrisPayments: [],
-        qrisMeta: {},
+        subPayments: [],
         newLead: { client_name: '', business_name: '', business_type: '', email: '', phone: '', notes: '' },
 
         get totalVerifiedRevenue() {
@@ -470,39 +461,29 @@ function portalApp() {
 
         async initPortal() {
             await this.loadLeads();
-            await this.loadQrisPayments();
+            await this.loadSubscriptionPayments();
             this.$nextTick(() => lucide.createIcons());
         },
 
-        async loadQrisPayments() {
+        async loadSubscriptionPayments() {
             try {
-                const res = await fetch('/api/portal/qris-payments');
+                const res = await fetch('/api/portal/subscription-payments');
                 const data = await res.json();
                 if (data.status === 'success') {
-                    this.qrisPayments = data.data.payments || [];
-                    this.qrisMeta = data.data;
+                    this.subPayments = data.data || [];
                 }
             } catch (err) { console.error(err); }
         },
 
-        async simulateQrisWebhook(amount) {
-            const secret = this.qrisMeta.webhook_secret || 'seka-yasa-qris-2026';
-            const formatted = Number(amount).toLocaleString('id-ID');
-            const res = await fetch('/api/webhooks/qris-mutation', {
+        async verifySubPayment(paymentId) {
+            const res = await fetch(`/api/portal/subscription-payments/${paymentId}/verify`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-QRIS-WEBHOOK-SECRET': secret,
-                },
-                body: JSON.stringify({
-                    message: `Pembayaran QRIS sebesar Rp ${formatted} berhasil diterima dari GoPay Merchant`,
-                }),
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
             });
             const result = await res.json();
             if (res.ok) {
-                Swal.fire({ icon: 'success', title: 'Webhook Terdeteksi!', text: result.message, confirmButtonColor: '#775229' });
-                await this.loadQrisPayments();
+                Swal.fire({ icon: 'success', title: 'Pembayaran Diverifikasi!', text: result.message, confirmButtonColor: '#775229' });
+                await this.loadSubscriptionPayments();
             } else {
                 Swal.fire({ icon: 'error', title: 'Gagal', text: result.message, confirmButtonColor: '#775229' });
             }

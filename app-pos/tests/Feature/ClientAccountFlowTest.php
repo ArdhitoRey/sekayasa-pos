@@ -66,7 +66,7 @@ class ClientAccountFlowTest extends TestCase
             ->postJson("/api/client/uat/{$otherUat->id}", ['status' => 'pass'])
             ->assertStatus(403);
 
-        // 5. Path A: Fresh client creates Dynamic QRIS invoice and pays via Auto-Detection Webhook
+        // 5. Path A: Fresh client creates Subscription invoice (Midtrans pending -> Portal admin verifies)
         $freshLogin = $this->postJson('/api/login', [
             'email' => 'klien@usaha.id',
             'password' => 'password123',
@@ -80,36 +80,21 @@ class ClientAccountFlowTest extends TestCase
         $rentRes->assertStatus(201);
 
         $payment = $rentRes->json('data.payment');
-        $exactAmount = (int) $payment['amount'];
-        $qrisPayload = $payment['qris_payload'];
+        $this->assertEquals('midtrans_pending', $payment['payment_method']);
+        $this->assertEquals('pending', $payment['status']);
 
-        // Verify Dynamic QRIS contains tag 010212, exact Tag 54 nominal, and valid CRC16
-        $this->assertStringStartsWith('000201010212', $qrisPayload);
-        $this->assertStringContainsString("540" . strlen((string) $exactAmount) . $exactAmount, $qrisPayload);
-        $bodyWithoutCrc = substr($qrisPayload, 0, -4);
-        $crcFromPayload = substr($qrisPayload, -4);
-        $this->assertEquals(\App\Services\QrisService::calculateCrc16($bodyWithoutCrc), $crcFromPayload);
-
-        // Before payment arrives, status is still pending
+        // Before verification, status is pending
         $pollBefore = $this->withHeader('Authorization', "Bearer {$freshToken}")
             ->getJson("/api/client/payments/{$payment['id']}/status");
         $pollBefore->assertStatus(200);
         $this->assertEquals('pending', $pollBefore->json('data.payment_status'));
 
-        // Unauthorized webhook must fail (401)
-        $this->postJson('/api/webhooks/qris-mutation', ['amount' => $exactAmount])
-            ->assertStatus(401);
+        // Portal Admin verifies subscription payment while Midtrans is in application
+        $verifyRes = $this->postJson("/api/portal/subscription-payments/{$payment['id']}/verify");
+        $verifyRes->assertStatus(200);
+        $this->assertEquals('verified', $verifyRes->json('data.payment.status'));
 
-        // Simulate GoPay Merchant Android notification webhook with formatted Indonesian Rupiah string
-        $formattedNominal = number_format($exactAmount, 0, ',', '.');
-        $webhookRes = $this->withHeader('X-QRIS-WEBHOOK-SECRET', 'seka-yasa-qris-2026')
-            ->postJson('/api/webhooks/qris-mutation', [
-                'message' => "Pembayaran QRIS sebesar Rp {$formattedNominal} berhasil diterima ke MUHHAMAD SATRIA RAMADHAN",
-            ]);
-        $webhookRes->assertStatus(200);
-        $this->assertTrue($webhookRes->json('matched'));
-
-        // Polling after webhook confirms auto-verification & unlocked POS access
+        // Polling confirms verification & unlocked POS access
         $pollAfter = $this->withHeader('Authorization', "Bearer {$freshToken}")
             ->getJson("/api/client/payments/{$payment['id']}/status");
         $pollAfter->assertStatus(200);
