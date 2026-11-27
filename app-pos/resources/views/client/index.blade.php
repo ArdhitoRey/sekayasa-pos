@@ -36,13 +36,13 @@
 
                 <div x-show="user.role === 'owner'" class="inline-flex items-center gap-1.5">
                     <button type="button" @click="showInstallGuideModal('webapk')"
-                        class="inline-flex items-center gap-1.5 h-8 px-2.5 bg-[#0D7A5F] hover:bg-[#095C47] text-white rounded-md font-bold transition"
-                        title="Pasang aplikasi kasir WebAPK / PWA langsung lewat browser">
-                        <i data-lucide="smartphone" class="w-3.5 h-3.5"></i>
-                        <span>Install WebAPK</span>
+                        class="inline-flex items-center gap-1.5 h-8 px-2.5 bg-[#143B32] border border-[rgba(51,65,85,0.75)] hover:border-[#34D399] text-[#FFFFFF] rounded-md font-bold transition"
+                        title="Lihat panduan pemasangan WebAPK / PWA di perangkat kasir">
+                        <i data-lucide="smartphone" class="w-3.5 h-3.5 text-[#34D399]"></i>
+                        <span>Cara WebAPK</span>
                     </button>
                     <button type="button" @click="showInstallGuideModal('apk')"
-                        class="inline-flex items-center gap-1.5 h-8 px-2.5 bg-[#143B32] border border-[#34D399]/40 hover:border-[#34D399] text-[#34D399] rounded-md font-bold transition"
+                        class="inline-flex items-center gap-1.5 h-8 px-2.5 bg-[#0D7A5F] hover:bg-[#095C47] text-white rounded-md font-bold transition"
                         title="Unduh file installer Android (.apk)">
                         <i data-lucide="download" class="w-3.5 h-3.5"></i>
                         <span>Download .APK</span>
@@ -176,11 +176,11 @@
                             <span class="text-[11px] text-[#475569]">Pasang App Kasir di HP/Tablet:</span>
                             <div class="flex flex-wrap items-center gap-1.5">
                                 <button type="button" @click="showInstallGuideModal('webapk')"
-                                    class="inline-flex items-center px-2.5 py-1 rounded-md bg-[#0D7A5F] hover:bg-[#095C47] text-white text-[11px] font-semibold transition">
-                                    Install WebAPK (PWA)
+                                    class="inline-flex items-center px-2.5 py-1 rounded-md border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 text-[11px] font-medium transition">
+                                    Cara Install WebAPK
                                 </button>
                                 <button type="button" @click="showInstallGuideModal('apk')"
-                                    class="inline-flex items-center px-2.5 py-1 rounded-md border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 text-[11px] font-medium transition">
+                                    class="inline-flex items-center px-2.5 py-1 rounded-md bg-[#0D7A5F] hover:bg-[#095C47] text-white text-[11px] font-semibold transition">
                                     Download .APK
                                 </button>
                             </div>

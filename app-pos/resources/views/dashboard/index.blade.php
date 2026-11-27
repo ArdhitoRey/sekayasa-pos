@@ -227,14 +227,14 @@
                 </button>
                 <div x-show="user.role === 'owner' && hasUnlockedWorkspace" class="inline-flex items-center gap-1.5">
                     <button type="button" @click="installKasirApk('webapk')"
-                        class="inline-flex items-center gap-1.5 h-8 px-2 sm:px-2.5 bg-[#0D7A5F] hover:bg-[#095C47] text-white rounded-md text-xs font-semibold transition"
-                        title="Pasang aplikasi kasir WebAPK / PWA langsung lewat browser">
-                        <i data-lucide="smartphone" class="w-3.5 h-3.5 shrink-0"></i>
-                        <span class="hidden sm:inline">Install WebAPK</span>
+                        class="inline-flex items-center gap-1.5 h-8 px-2 sm:px-2.5 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-700 rounded-md text-xs font-semibold transition"
+                        title="Lihat panduan pemasangan WebAPK / PWA di perangkat kasir">
+                        <i data-lucide="smartphone" class="w-3.5 h-3.5 shrink-0 text-[#0D7A5F]"></i>
+                        <span class="hidden sm:inline">Cara WebAPK</span>
                         <span class="sm:hidden">WebAPK</span>
                     </button>
                     <button type="button" @click="installKasirApk('apk')"
-                        class="inline-flex items-center gap-1.5 h-8 px-2 sm:px-2.5 bg-[#0D2620] hover:bg-[#143B32] text-[#34D399] rounded-md text-xs font-semibold transition"
+                        class="inline-flex items-center gap-1.5 h-8 px-2 sm:px-2.5 bg-[#0D7A5F] hover:bg-[#095C47] text-white rounded-md text-xs font-semibold transition"
                         title="Unduh file installer Android (.apk)">
                         <i data-lucide="download" class="w-3.5 h-3.5 shrink-0"></i>
                         <span class="hidden sm:inline">Download .APK</span>
@@ -1408,17 +1408,17 @@
                                 <span class="text-sm font-bold text-[#0D2620]">Pemasangan Aplikasi Kasir Perangkat Outlet</span>
                                 <span x-show="!business.can_install_apk" class="px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-semibold">Perlu Langganan Aktif</span>
                             </div>
-                            <p x-show="business.can_install_apk" class="text-xs text-slate-500 mt-0.5">Pilih instalasi langsung lewat browser (<b>WebAPK / PWA</b>) atau unduh installer Android (<b>.APK</b>). Setelah terpasang, kasir cukup login dengan akun Kasir masing-masing.</p>
+                            <p x-show="business.can_install_apk" class="text-xs text-slate-500 mt-0.5">Unduh installer Android (<b>.APK</b>) untuk perangkat kasir atau baca panduan pasang <b>WebAPK / PWA</b> via browser. Setelah terpasang, kasir cukup login dengan akun Kasir masing-masing.</p>
                             <p x-show="!business.can_install_apk" class="text-xs text-slate-500 mt-0.5">Pemasangan aplikasi kasir pada perangkat outlet terbuka otomatis setelah Anda berlangganan paket aktif di menu Langganan &amp; Tagihan.</p>
                         </div>
                     </div>
                     <div x-show="business.can_install_apk" class="flex flex-wrap items-center gap-2 shrink-0">
                         <button type="button" @click="installKasirApk('webapk')"
-                            class="inline-flex items-center gap-2 h-9 px-3.5 bg-[#0D7A5F] hover:bg-[#095C47] text-white rounded-md text-xs font-bold transition">
-                            <i data-lucide="smartphone" class="w-4 h-4"></i> Install WebAPK (PWA)
+                            class="inline-flex items-center gap-2 h-9 px-3.5 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-700 rounded-md text-xs font-bold transition">
+                            <i data-lucide="smartphone" class="w-4 h-4 text-[#0D7A5F]"></i> Cara Pasang WebAPK
                         </button>
                         <button type="button" @click="installKasirApk('apk')"
-                            class="inline-flex items-center gap-2 h-9 px-3.5 bg-[#0D2620] hover:bg-[#143B32] text-[#34D399] rounded-md text-xs font-bold transition">
+                            class="inline-flex items-center gap-2 h-9 px-3.5 bg-[#0D7A5F] hover:bg-[#095C47] text-white rounded-md text-xs font-bold transition">
                             <i data-lucide="download" class="w-4 h-4"></i> Download File .APK
                         </button>
                     </div>
@@ -1528,8 +1528,8 @@
                             <div class="text-xs font-semibold text-slate-800 mt-0.5" x-text="business.can_install_apk ? 'Siap Dipasang di Cabang' : 'Menunggu Langganan Aktif'"></div>
                         </div>
                         <div x-show="business.can_install_apk" class="flex flex-wrap items-center gap-1.5 shrink-0">
-                            <button type="button" @click="installKasirApk('webapk')" class="inline-flex items-center gap-1 px-2.5 py-1.5 bg-[#0D7A5F] hover:bg-[#095C47] text-white rounded-md text-xs font-bold transition">Install WebAPK</button>
-                            <button type="button" @click="installKasirApk('apk')" class="inline-flex items-center gap-1 px-2.5 py-1.5 bg-[#0D2620] hover:bg-[#143B32] text-[#34D399] rounded-md text-xs font-bold transition">Download .APK</button>
+                            <button type="button" @click="installKasirApk('webapk')" class="inline-flex items-center gap-1 px-2.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-700 rounded-md text-xs font-bold transition">Cara WebAPK</button>
+                            <button type="button" @click="installKasirApk('apk')" class="inline-flex items-center gap-1 px-2.5 py-1.5 bg-[#0D7A5F] hover:bg-[#095C47] text-white rounded-md text-xs font-bold transition">Download .APK</button>
                         </div>
                     </div>
                 </div>
