@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Tandha by SEKA GROUP — Aplikasi Kasir, Stok Cabang & Solusi POS Bisnis')</title>
-    <link rel="icon" type="image/svg+xml" href="/assets/Logo%20Tandha.svg?v=4">
-    <link rel="icon" type="image/png" sizes="192x192" href="/tandha-icon-192.png?v=4">
-    <link rel="shortcut icon" href="/favicon.ico?v=4">
+    <link rel="icon" type="image/svg+xml" href="/assets/Logo%20Tandha.svg?v=5">
+    <link rel="icon" type="image/png" sizes="192x192" href="/tandha-icon-192.png?v=5">
+    <link rel="shortcut icon" href="/favicon.ico?v=5">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

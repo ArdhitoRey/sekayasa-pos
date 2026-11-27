@@ -1329,6 +1329,8 @@ class ClientAccountFlowTest extends TestCase
         $this->assertFileExists(public_path('icon-512.png'));
         $this->assertFileExists(public_path('tandha-icon-192.png'));
         $this->assertFileExists(public_path('tandha-icon-512.png'));
+        $this->assertFileExists(public_path('tandha-maskable-192.png'));
+        $this->assertFileExists(public_path('tandha-maskable-512.png'));
         $this->assertGreaterThan(0, filesize(public_path('favicon.ico')));
         $this->assertFileExists(public_path('assets/Logo Tandha.svg'));
     }

@@ -1,9 +1,12 @@
-const CACHE_NAME = 'tandha-kasir-v5';
+const CACHE_NAME = 'tandha-kasir-v6';
 const urlsToCache = [
   '/pos?app=kasir',
-  '/manifest.json?v=4',
-  '/tandha-icon-192.png?v=4',
-  '/tandha-icon-512.png?v=4'
+  '/manifest.json?v=5',
+  '/assets/Logo%20Tandha.svg?v=5',
+  '/tandha-icon-192.png?v=5',
+  '/tandha-icon-512.png?v=5',
+  '/tandha-maskable-192.png?v=5',
+  '/tandha-maskable-512.png?v=5'
 ];
 
 self.addEventListener('install', event => {
@@ -22,8 +25,9 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-  // Network first so code updates apply automatically whenever connected to Wi-Fi/internet
-  if (event.request.method === 'GET' && event.request.url.includes('/pos')) {
+  if (event.request.method !== 'GET') return;
+  const reqUrl = new URL(event.request.url);
+  if (reqUrl.origin === self.location.origin && (reqUrl.pathname === '/pos' || reqUrl.pathname === '/manifest.json')) {
     event.respondWith(
       fetch(event.request).catch(() => caches.match(event.request))
     );
