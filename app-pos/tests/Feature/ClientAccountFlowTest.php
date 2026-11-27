@@ -1354,6 +1354,9 @@ class ClientAccountFlowTest extends TestCase
         $this->assertStringContainsString('Pengaturan Bisnis', $dashboardHtml);
         $this->assertStringContainsString('Paket &amp; Dukungan', $dashboardHtml);
         $this->assertStringContainsString('hasUnlockedWorkspace', $dashboardHtml);
+        $this->assertStringContainsString("installKasirApk('webapk')", $dashboardHtml);
+        $this->assertStringContainsString("installKasirApk('apk')", $dashboardHtml);
+        $this->assertStringContainsString('window.triggerTandhaInstallApk', $dashboardHtml);
 
         $overviewBefore = $this->getJson('/api/client/overview')->assertStatus(200);
         $this->assertFalse((bool) $overviewBefore->json('data.can_install_apk'));

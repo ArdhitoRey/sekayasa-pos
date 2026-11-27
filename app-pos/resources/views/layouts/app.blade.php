@@ -152,7 +152,7 @@
     <script>
         window.__tandhaInstallPrompt = null;
         window.__tandhaPromptWaiters = [];
-        window.__tandhaHasPhysicalApk = @json(is_file(public_path('downloads/tandha-kasir.apk')) || !empty(env('TANDHA_APK_DOWNLOAD_URL')));
+        window.__tandhaHasPhysicalApk = @json(is_file(public_path('downloads/tandha-kasir.apk')) || !empty(config('app.kasir_apk_download_url')));
         window.__tandhaCanInstallApk = false;
 
         window.tandhaEscapeHtml = function (value) {
@@ -193,7 +193,7 @@
             });
         };
 
-        window.triggerTandhaInstallApk = async function () {
+        window.triggerTandhaInstallApk = async function (mode = 'webapk') {
             if (!window.__tandhaCanInstallApk) {
                 await Swal.fire({
                     icon: 'info',
@@ -205,8 +205,23 @@
                 return;
             }
 
-            if (window.__tandhaHasPhysicalApk) {
-                window.location.href = '/download/kasir-apk';
+            if (mode === 'apk') {
+                if (window.__tandhaHasPhysicalApk) {
+                    window.location.href = '/download/kasir-apk';
+                    return;
+                }
+                const apkMissingRes = await Swal.fire({
+                    icon: 'info',
+                    title: 'File .APK Android Belum Tersedia',
+                    html: '<p class="text-sm text-slate-600 leading-relaxed">File biner Android (<code>public/downloads/tandha-kasir.apk</code>) belum diunggah ke server. Anda tetap bisa langsung memasang versi <b>WebAPK / PWA</b> dari browser sekarang dengan ikon Tandha resmi.</p>',
+                    showCancelButton: true,
+                    confirmButtonText: 'Install WebAPK (PWA) Sekarang',
+                    cancelButtonText: 'Tutup',
+                    confirmButtonColor: '#0D7A5F',
+                });
+                if (apkMissingRes.isConfirmed) {
+                    return window.triggerTandhaInstallApk('webapk');
+                }
                 return;
             }
 
@@ -230,7 +245,7 @@
                 if (choice && choice.outcome === 'accepted') {
                     Swal.fire({
                         icon: 'success',
-                        title: 'Aplikasi Kasir Terpasang',
+                        title: 'WebAPK Kasir Terpasang',
                         text: 'Aplikasi Kasir Tandha siap digunakan dari layar utama perangkat. Buka aplikasi dan masuk menggunakan akun Kasir cabang Anda.',
                         confirmButtonColor: '#0D7A5F',
                     });

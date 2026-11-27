@@ -34,12 +34,20 @@
                     Harga Paket
                 </a>
 
-                <button x-show="user.role === 'owner'" type="button" @click="showInstallGuideModal()"
-                    class="inline-flex items-center gap-1.5 h-8 px-3 bg-[#0D7A5F] hover:bg-[#095C47] text-white rounded-md font-bold transition"
-                    title="Khusus Owner: Pasang aplikasi kasir di perangkat klien ini">
-                    <i data-lucide="smartphone" class="w-3.5 h-3.5"></i>
-                    <span>Install APK</span>
-                </button>
+                <div x-show="user.role === 'owner'" class="inline-flex items-center gap-1.5">
+                    <button type="button" @click="showInstallGuideModal('webapk')"
+                        class="inline-flex items-center gap-1.5 h-8 px-2.5 bg-[#0D7A5F] hover:bg-[#095C47] text-white rounded-md font-bold transition"
+                        title="Pasang aplikasi kasir WebAPK / PWA langsung lewat browser">
+                        <i data-lucide="smartphone" class="w-3.5 h-3.5"></i>
+                        <span>Install WebAPK</span>
+                    </button>
+                    <button type="button" @click="showInstallGuideModal('apk')"
+                        class="inline-flex items-center gap-1.5 h-8 px-2.5 bg-[#143B32] border border-[#34D399]/40 hover:border-[#34D399] text-[#34D399] rounded-md font-bold transition"
+                        title="Unduh file installer Android (.apk)">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                        <span>Download .APK</span>
+                    </button>
+                </div>
 
                 <!-- Operational Shortcuts (Unlocked if template_saas rented or custom project live; Owner gets Read-Only Preview POS) -->
                 <template x-if="canAccessPosApp">
@@ -164,12 +172,18 @@
                             <div>• Buka/tutup shift kasir dengan kontrol fitur oleh Owner</div>
                             <div>• Stok multi-outlet, penyesuaian stok &amp; laporan laba kotor</div>
                         </div>
-                        <div x-show="user.role === 'owner'" class="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                        <div x-show="user.role === 'owner'" class="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
                             <span class="text-[11px] text-[#475569]">Pasang App Kasir di HP/Tablet:</span>
-                            <button type="button" @click="showInstallGuideModal()"
-                                class="inline-flex items-center px-2.5 py-1 rounded-md border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 text-[11px] font-medium transition">
-                                Cara Install APK
-                            </button>
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <button type="button" @click="showInstallGuideModal('webapk')"
+                                    class="inline-flex items-center px-2.5 py-1 rounded-md bg-[#0D7A5F] hover:bg-[#095C47] text-white text-[11px] font-semibold transition">
+                                    Install WebAPK (PWA)
+                                </button>
+                                <button type="button" @click="showInstallGuideModal('apk')"
+                                    class="inline-flex items-center px-2.5 py-1 rounded-md border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 text-[11px] font-medium transition">
+                                    Download .APK
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -910,10 +924,10 @@ function clientPortalApp() {
             template_gap_notes: '',
         },
 
-        showInstallGuideModal() {
+        showInstallGuideModal(mode = 'webapk') {
             if (!this.user || this.user.role !== 'owner') return;
             if (typeof window.triggerTandhaInstallApk === 'function') {
-                return window.triggerTandhaInstallApk();
+                return window.triggerTandhaInstallApk(mode);
             }
         },
 
@@ -1011,6 +1025,7 @@ function clientPortalApp() {
                 if (result.status === 'success') {
                     this.user = result.data.user;
                     this.business = result.data.user.business || {};
+                    window.__tandhaCanInstallApk = Boolean((this.business && this.business.can_install_apk) || result.data.can_install_apk);
                     this.subscriptionSummary = result.data.subscription_summary || null;
                     this.usage = result.data.usage || { outlets_count: 0, users_count: 0, products_count: 0 };
                     this.plans = result.data.plans || [];

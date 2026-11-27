@@ -123,4 +123,6 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    'kasir_apk_download_url' => env('TANDHA_APK_DOWNLOAD_URL', ''),
+
 ];

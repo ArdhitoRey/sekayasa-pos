@@ -96,7 +96,7 @@ Route::get('/download/kasir-apk', function () {
             'Content-Type' => 'application/vnd.android.package-archive',
         ]);
     }
-    $externalUrl = (string) env('TANDHA_APK_DOWNLOAD_URL', '');
+    $externalUrl = (string) config('app.kasir_apk_download_url', '');
     if ($externalUrl !== '' && preg_match('#^https?://#i', $externalUrl) === 1) {
         return redirect()->away($externalUrl);
     }

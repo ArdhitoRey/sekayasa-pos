@@ -225,13 +225,22 @@
                     title="Tinjau tampilan menu, pajak, dan struk cabang langsung di halaman ini">
                     <i data-lucide="eye" class="w-3.5 h-3.5 text-slate-500"></i> Preview Kasir
                 </button>
-                <button x-show="user.role === 'owner' && hasUnlockedWorkspace" type="button" @click="installKasirApk()"
-                    class="inline-flex items-center gap-1.5 h-8 px-2.5 sm:px-3 bg-[#0D7A5F] hover:bg-[#095C47] text-white rounded-md text-xs font-semibold transition"
-                    title="Pasang aplikasi kasir pada perangkat outlet Anda">
-                    <i data-lucide="smartphone" class="w-3.5 h-3.5 shrink-0"></i>
-                    <span class="hidden sm:inline">Install APK</span>
-                    <span class="sm:hidden">APK</span>
-                </button>
+                <div x-show="user.role === 'owner' && hasUnlockedWorkspace" class="inline-flex items-center gap-1.5">
+                    <button type="button" @click="installKasirApk('webapk')"
+                        class="inline-flex items-center gap-1.5 h-8 px-2 sm:px-2.5 bg-[#0D7A5F] hover:bg-[#095C47] text-white rounded-md text-xs font-semibold transition"
+                        title="Pasang aplikasi kasir WebAPK / PWA langsung lewat browser">
+                        <i data-lucide="smartphone" class="w-3.5 h-3.5 shrink-0"></i>
+                        <span class="hidden sm:inline">Install WebAPK</span>
+                        <span class="sm:hidden">WebAPK</span>
+                    </button>
+                    <button type="button" @click="installKasirApk('apk')"
+                        class="inline-flex items-center gap-1.5 h-8 px-2 sm:px-2.5 bg-[#0D2620] hover:bg-[#143B32] text-[#34D399] rounded-md text-xs font-semibold transition"
+                        title="Unduh file installer Android (.apk)">
+                        <i data-lucide="download" class="w-3.5 h-3.5 shrink-0"></i>
+                        <span class="hidden sm:inline">Download .APK</span>
+                        <span class="sm:hidden">.APK</span>
+                    </button>
+                </div>
                 <button type="button" x-show="user.role === 'owner' && business.subscription_summary" @click="setTab('billing')"
                     class="hidden md:inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-semibold border transition"
                     :class="business.subscription_summary && business.subscription_summary.lifecycle_status === 'expired'
@@ -1399,14 +1408,20 @@
                                 <span class="text-sm font-bold text-[#0D2620]">Pemasangan Aplikasi Kasir Perangkat Outlet</span>
                                 <span x-show="!business.can_install_apk" class="px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-semibold">Perlu Langganan Aktif</span>
                             </div>
-                            <p x-show="business.can_install_apk" class="text-xs text-slate-500 mt-0.5">Masuk menggunakan akun Pemilik pada perangkat kasir yang akan dipakai, lalu tekan tombol ini untuk memasang aplikasi kasir cabang. Setelah terpasang, kasir cukup login dengan akun Kasir masing-masing.</p>
+                            <p x-show="business.can_install_apk" class="text-xs text-slate-500 mt-0.5">Pilih instalasi langsung lewat browser (<b>WebAPK / PWA</b>) atau unduh installer Android (<b>.APK</b>). Setelah terpasang, kasir cukup login dengan akun Kasir masing-masing.</p>
                             <p x-show="!business.can_install_apk" class="text-xs text-slate-500 mt-0.5">Pemasangan aplikasi kasir pada perangkat outlet terbuka otomatis setelah Anda berlangganan paket aktif di menu Langganan &amp; Tagihan.</p>
                         </div>
                     </div>
-                    <button x-show="business.can_install_apk" type="button" @click="installKasirApk()"
-                        class="inline-flex items-center gap-2 h-9 px-4 bg-[#0D2620] hover:bg-[#143B32] text-[#34D399] rounded-md text-xs font-bold transition shrink-0">
-                        <i data-lucide="smartphone" class="w-4 h-4"></i> Install APK Kasir
-                    </button>
+                    <div x-show="business.can_install_apk" class="flex flex-wrap items-center gap-2 shrink-0">
+                        <button type="button" @click="installKasirApk('webapk')"
+                            class="inline-flex items-center gap-2 h-9 px-3.5 bg-[#0D7A5F] hover:bg-[#095C47] text-white rounded-md text-xs font-bold transition">
+                            <i data-lucide="smartphone" class="w-4 h-4"></i> Install WebAPK (PWA)
+                        </button>
+                        <button type="button" @click="installKasirApk('apk')"
+                            class="inline-flex items-center gap-2 h-9 px-3.5 bg-[#0D2620] hover:bg-[#143B32] text-[#34D399] rounded-md text-xs font-bold transition">
+                            <i data-lucide="download" class="w-4 h-4"></i> Download File .APK
+                        </button>
+                    </div>
                     <button x-show="!business.can_install_apk" type="button" @click="setTab('billing')"
                         class="inline-flex items-center gap-2 h-9 px-4 bg-[#0D7A5F] hover:bg-[#095C47] text-white rounded-md text-xs font-bold transition shrink-0">
                         Aktifkan Paket Langganan →
@@ -1512,7 +1527,10 @@
                             <span class="text-[11px] font-semibold text-slate-500">Perangkat Kasir</span>
                             <div class="text-xs font-semibold text-slate-800 mt-0.5" x-text="business.can_install_apk ? 'Siap Dipasang di Cabang' : 'Menunggu Langganan Aktif'"></div>
                         </div>
-                        <button x-show="business.can_install_apk" type="button" @click="installKasirApk()" class="px-3 py-1.5 bg-[#0D2620] hover:bg-[#143B32] text-[#34D399] rounded-md text-xs font-bold transition shrink-0">Install APK</button>
+                        <div x-show="business.can_install_apk" class="flex flex-wrap items-center gap-1.5 shrink-0">
+                            <button type="button" @click="installKasirApk('webapk')" class="inline-flex items-center gap-1 px-2.5 py-1.5 bg-[#0D7A5F] hover:bg-[#095C47] text-white rounded-md text-xs font-bold transition">Install WebAPK</button>
+                            <button type="button" @click="installKasirApk('apk')" class="inline-flex items-center gap-1 px-2.5 py-1.5 bg-[#0D2620] hover:bg-[#143B32] text-[#34D399] rounded-md text-xs font-bold transition">Download .APK</button>
+                        </div>
                     </div>
                 </div>
 
@@ -5335,7 +5353,7 @@ function dashboardApp() {
             this.previewIframeLoading = false;
             if (this.openDropdown === 'previewOutlet') this.openDropdown = null;
         },
-        installKasirApk() {
+        installKasirApk(mode = 'webapk') {
             if (!this.user || this.user.role !== 'owner') return;
             if (!this.business || !this.business.can_install_apk) {
                 Swal.fire({
@@ -5352,7 +5370,7 @@ function dashboardApp() {
                 return;
             }
             if (typeof window.triggerTandhaInstallApk === 'function') {
-                return window.triggerTandhaInstallApk();
+                return window.triggerTandhaInstallApk(mode);
             }
         },
         logout() { localStorage.removeItem('pos_token'); localStorage.removeItem('pos_user'); window.location.href = '/login'; },
