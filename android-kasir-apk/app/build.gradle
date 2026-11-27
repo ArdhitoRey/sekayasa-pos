@@ -1,0 +1,57 @@
+plugins {
+    id 'com.android.application'
+}
+
+def resolvedKasirUrl = (project.findProperty('KASIR_URL') ?: 'https://assertive-cyan-otter.202-155-137-32.cpanel.site/pos?app=kasir').toString()
+def keystorePath = project.findProperty('KEYSTORE_FILE') ?: System.getenv('KEYSTORE_FILE')
+
+android {
+    namespace 'com.sekayasa.tandhakasir'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.sekayasa.tandhakasir"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0.0"
+
+        buildConfigField "String", "KASIR_URL", "\"${resolvedKasirUrl.replace('"', '\\"')}\""
+    }
+
+    buildFeatures {
+        buildConfig = true
+    }
+
+    signingConfigs {
+        release {
+            if (keystorePath) {
+                storeFile file(keystorePath)
+                storePassword(project.findProperty('KEYSTORE_PASSWORD') ?: System.getenv('KEYSTORE_PASSWORD') ?: 'tandha2026')
+                keyAlias(project.findProperty('KEY_ALIAS') ?: System.getenv('KEY_ALIAS') ?: 'tandha')
+                keyPassword(project.findProperty('KEY_PASSWORD') ?: System.getenv('KEY_PASSWORD') ?: 'tandha2026')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            shrinkResources false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (keystorePath) {
+                signingConfig signingConfigs.release
+            } else {
+                signingConfig signingConfigs.debug
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+}

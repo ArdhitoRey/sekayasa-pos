@@ -1,0 +1,132 @@
+name: Build Tandha Kasir APK
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'android-kasir-apk/**'
+      - '.github/workflows/build-kasir-apk.yml'
+  workflow_dispatch:
+    inputs:
+      kasir_url:
+        description: 'URL Terminal Kasir (/pos?app=kasir) yang akan dibungkus di APK'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-kasir-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Prepare Android Release Keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+            echo "KEYSTORE_PASSWORD=${ANDROID_KEYSTORE_PASSWORD:-tandha2026}" >> "$GITHUB_ENV"
+            echo "KEY_ALIAS=${ANDROID_KEY_ALIAS:-tandha}" >> "$GITHUB_ENV"
+            echo "KEY_PASSWORD=${ANDROID_KEY_PASSWORD:-tandha2026}" >> "$GITHUB_ENV"
+          else
+            keytool -genkeypair -v \
+              -keystore "$RUNNER_TEMP/release.keystore" \
+              -storetype PKCS12 \
+              -alias tandha \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass tandha2026 \
+              -keypass tandha2026 \
+              -dname "CN=Tandha POS Kasir, OU=SEKA GROUP, O=Sekayasa, L=Indonesia, C=ID"
+            echo "KEYSTORE_PASSWORD=tandha2026" >> "$GITHUB_ENV"
+            echo "KEY_ALIAS=tandha" >> "$GITHUB_ENV"
+            echo "KEY_PASSWORD=tandha2026" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build Signed Release APK
+        working-directory: android-kasir-apk
+        env:
+          INPUT_URL: ${{ github.event.inputs.kasir_url }}
+          VAR_URL: ${{ vars.KASIR_APP_URL }}
+        run: |
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          if [ -x "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
+            yes | "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
+          fi
+          TARGET_URL="${INPUT_URL:-${VAR_URL:-https://assertive-cyan-otter.202-155-137-32.cpanel.site/pos?app=kasir}}"
+          echo "Building Tandha Kasir APK for URL: $TARGET_URL"
+          gradle assembleRelease --no-daemon \
+            -PKASIR_URL="$TARGET_URL" \
+            -PKEYSTORE_FILE="$RUNNER_TEMP/release.keystore" \
+            -PKEYSTORE_PASSWORD="$KEYSTORE_PASSWORD" \
+            -PKEY_ALIAS="$KEY_ALIAS" \
+            -PKEY_PASSWORD="$KEY_PASSWORD"
+
+      - name: Verify APK Signature & Stage Download File
+        run: |
+          APK_SRC="android-kasir-apk/app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK_SRC"
+          BUILD_TOOLS_DIR="$(ls -d "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools/"* | sort -V | tail -n 1)"
+          "$BUILD_TOOLS_DIR/apksigner" verify --verbose "$APK_SRC"
+          mkdir -p app-pos/public/downloads
+          cp "$APK_SRC" app-pos/public/downloads/tandha-kasir.apk
+          ls -lh app-pos/public/downloads/tandha-kasir.apk
+
+      - name: Upload APK Workflow Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tandha-pos-kasir-apk
+          path: app-pos/public/downloads/tandha-kasir.apk
+
+      - name: Commit Compiled APK to Repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f app-pos/public/downloads/tandha-kasir.apk
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: publish compiled tandha-kasir.apk [skip ci]"
+            git pull --rebase origin main
+            git push origin HEAD:main
+          else
+            echo "APK unchanged, skipping commit."
+          fi
+
+      - name: Publish GitHub Release Asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view kasir-apk-latest >/dev/null 2>&1; then
+            gh release upload kasir-apk-latest "app-pos/public/downloads/tandha-kasir.apk#tandha-pos-kasir.apk" --clobber
+          else
+            gh release create kasir-apk-latest "app-pos/public/downloads/tandha-kasir.apk#tandha-pos-kasir.apk" \
+              --target main \
+              --title "Tandha POS Kasir Android APK" \
+              --notes "Build otomatis aplikasi Android Tandha POS Kasir berikon resmi Tandha (#0D2620)." \
+              --latest
+          fi
