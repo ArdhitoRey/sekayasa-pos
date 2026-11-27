@@ -20,6 +20,33 @@ class ActivityLog extends Model
         'payload' => 'array',
     ];
 
+    /**
+     * Safely record an audit, operational, or error event without disrupting caller flow.
+     */
+    public static function record(
+        ?int $businessId,
+        ?int $userId,
+        string $action,
+        ?string $entityType = null,
+        ?int $entityId = null,
+        array $payload = [],
+        ?string $ip = null
+    ): void {
+        try {
+            static::create([
+                'business_id' => $businessId,
+                'user_id' => $userId,
+                'action' => $action,
+                'entity_type' => $entityType,
+                'entity_id' => $entityId,
+                'payload' => $payload,
+                'ip_address' => $ip ?? request()?->ip(),
+            ]);
+        } catch (\Throwable $e) {
+            // Never break operational requests if audit logging fails
+        }
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);

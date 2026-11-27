@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
 use App\Models\Inventory;
+use App\Models\Outlet;
 use App\Models\Product;
 use App\Models\StockMovement;
 use Illuminate\Http\Request;
@@ -17,7 +19,13 @@ class InventoryController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
+        if (!$user->canManageOperations()) {
+            return response()->json(['status' => 'error', 'message' => 'Pemantauan stok hanya dapat diakses oleh Owner atau Admin Toko.'], 403);
+        }
         $outletId = $request->query('outlet_id', $user->outlet_id);
+        if ($outletId) {
+            Outlet::where('business_id', $user->business_id)->findOrFail($outletId);
+        }
 
         $products = Product::where('business_id', $user->business_id)
             ->where('is_active', true)
@@ -49,6 +57,15 @@ class InventoryController extends Controller
     public function adjustStock(Request $request)
     {
         $user = $request->user();
+        if (!$user->canManageOperations()) {
+            return response()->json(['status' => 'error', 'message' => 'Hanya Owner atau Admin yang dapat menyesuaikan stok.'], 403);
+        }
+        if ($user->role === 'admin' && $user->business) {
+            $settings = $user->business->resolvedFeatureSettings();
+            if (empty($settings['admin_manage_inventory'])) {
+                return response()->json(['status' => 'error', 'message' => 'Pemilik bisnis menonaktifkan akses penyesuaian stok untuk Admin.'], 403);
+            }
+        }
         $validated = $request->validate([
             'outlet_id' => 'required|exists:outlets,id',
             'product_id' => 'required|exists:products,id',
@@ -57,7 +74,10 @@ class InventoryController extends Controller
             'reason' => 'required|string|min:3',
         ]);
 
-        return DB::transaction(function () use ($user, $validated) {
+        Outlet::where('business_id', $user->business_id)->findOrFail($validated['outlet_id']);
+        Product::where('business_id', $user->business_id)->findOrFail($validated['product_id']);
+
+        return DB::transaction(function () use ($user, $validated, $request) {
             $inventory = Inventory::firstOrCreate(
                 [
                     'outlet_id' => $validated['outlet_id'],
@@ -94,6 +114,24 @@ class InventoryController extends Controller
                 'user_id' => $user->id,
             ]);
 
+            ActivityLog::record(
+                $user->business_id,
+                $user->id,
+                'inventory_adjusted',
+                'StockMovement',
+                $movement->id,
+                [
+                    'outlet_id' => $validated['outlet_id'],
+                    'product_id' => $validated['product_id'],
+                    'type' => $validated['type'],
+                    'change' => $change,
+                    'before' => $before,
+                    'after' => $after,
+                    'reason' => $validated['reason'],
+                ],
+                $request->ip()
+            );
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Penyesuaian stok berhasil disimpan',
@@ -111,6 +149,15 @@ class InventoryController extends Controller
     public function transferStock(Request $request)
     {
         $user = $request->user();
+        if (!$user->canManageOperations()) {
+            return response()->json(['status' => 'error', 'message' => 'Hanya Owner atau Admin yang dapat melakukan transfer stok antar-outlet.'], 403);
+        }
+        if ($user->role === 'admin' && $user->business) {
+            $settings = $user->business->resolvedFeatureSettings();
+            if (empty($settings['admin_manage_inventory'])) {
+                return response()->json(['status' => 'error', 'message' => 'Pemilik bisnis menonaktifkan akses transfer stok untuk Admin.'], 403);
+            }
+        }
         $validated = $request->validate([
             'from_outlet_id' => 'required|exists:outlets,id',
             'to_outlet_id' => 'required|exists:outlets,id|different:from_outlet_id',
@@ -119,7 +166,11 @@ class InventoryController extends Controller
             'reason' => 'nullable|string',
         ]);
 
-        return DB::transaction(function () use ($user, $validated) {
+        Outlet::where('business_id', $user->business_id)->findOrFail($validated['from_outlet_id']);
+        Outlet::where('business_id', $user->business_id)->findOrFail($validated['to_outlet_id']);
+        Product::where('business_id', $user->business_id)->findOrFail($validated['product_id']);
+
+        return DB::transaction(function () use ($user, $validated, $request) {
             $fromInv = Inventory::where('outlet_id', $validated['from_outlet_id'])
                 ->where('product_id', $validated['product_id'])
                 ->lockForUpdate()
@@ -179,6 +230,21 @@ class InventoryController extends Controller
                 'user_id' => $user->id,
             ]);
 
+            ActivityLog::record(
+                $user->business_id,
+                $user->id,
+                'inventory_transferred',
+                'Product',
+                (int) $validated['product_id'],
+                [
+                    'from_outlet_id' => $validated['from_outlet_id'],
+                    'to_outlet_id' => $validated['to_outlet_id'],
+                    'quantity' => $qty,
+                    'reason' => $validated['reason'] ?? null,
+                ],
+                $request->ip()
+            );
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Transfer stok antar-outlet berhasil.',
@@ -192,7 +258,13 @@ class InventoryController extends Controller
     public function movements(Request $request)
     {
         $user = $request->user();
-        $outletId = $request->query('outlet_id', $user->outlet_id);
+        if (!$user->canManageOperations()) {
+            return response()->json(['status' => 'error', 'message' => 'Riwayat mutasi stok hanya dapat diakses oleh Owner atau Admin Toko.'], 403);
+        }
+        $outletId = $request->query('outlet_id');
+        if ($outletId) {
+            Outlet::where('business_id', $user->business_id)->findOrFail($outletId);
+        }
 
         $query = StockMovement::where('business_id', $user->business_id)
             ->with(['product', 'user', 'outlet'])
@@ -200,13 +272,15 @@ class InventoryController extends Controller
 
         if ($outletId) {
             $query->where('outlet_id', $outletId);
+        } elseif ($user->role !== 'owner' && $user->role !== 'admin' && $user->outlet_id) {
+            $query->where('outlet_id', $user->outlet_id);
         }
 
         if ($productId = $request->query('product_id')) {
             $query->where('product_id', $productId);
         }
 
-        $movements = $query->paginate(25);
+        $movements = $query->paginate(200);
 
         return response()->json([
             'status' => 'success',

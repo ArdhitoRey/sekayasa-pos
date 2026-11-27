@@ -44,7 +44,33 @@ class PosTransactionTest extends TestCase
         $product1 = $products[0];
         $initialStock = $product1['current_stock'];
 
-        // 3. Process Checkout
+        // Ensure cashier starts with no open shift, then verify checkout is blocked until shift is opened
+        $cashierUser = User::where('email', 'kasir@kopi.id')->firstOrFail();
+        CashierShift::where('user_id', $cashierUser->id)->where('status', 'open')->update([
+            'status' => 'closed',
+            'closed_at' => now(),
+        ]);
+
+        // 2b. Checkout without opening a shift must be blocked (422 SHIFT_NOT_OPEN)
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/pos/checkout', [
+                'outlet_id' => $outletId,
+                'items' => [['product_id' => $product1['id'], 'quantity' => 1]],
+                'payment_method' => 'cash',
+                'amount_paid' => 200000,
+            ])->assertStatus(422)
+              ->assertJsonPath('code', 'SHIFT_NOT_OPEN');
+
+        // 2c. Open Cashier Shift first
+        $shiftRes = $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson('/api/shifts/open', [
+                'outlet_id' => $outletId,
+                'initial_cash' => 200000,
+                'notes' => 'Shift Pagi',
+            ])->assertStatus(201);
+        $shiftId = $shiftRes->json('data.id');
+
+        // 3. Process Checkout with active shift
         $checkoutResponse = $this->withHeader('Authorization', "Bearer {$token}")
             ->postJson('/api/pos/checkout', [
                 'outlet_id' => $outletId,
@@ -57,11 +83,16 @@ class PosTransactionTest extends TestCase
                 'tax_percentage' => 11,
                 'payment_method' => 'cash',
                 'amount_paid' => 200000,
+                'notes' => 'Meja 04 - Tanpa Gula',
             ]);
 
         $checkoutResponse->assertStatus(201);
         $invoiceNumber = $checkoutResponse->json('data.transaction.invoice_number');
         $this->assertStringStartsWith("INV-{$outletId}-", $invoiceNumber);
+        $this->assertEquals($shiftId, $checkoutResponse->json('data.transaction.shift_id'));
+        $this->assertEquals('Meja 04 - Tanpa Gula', $checkoutResponse->json('data.receipt.notes'));
+
+        $this->assertGreaterThan(0, (float) CashierShift::find($shiftId)->cash_sales_total);
 
         // 4. Verify Stock Deduction
         $inventoryAfter = Inventory::where('outlet_id', $outletId)

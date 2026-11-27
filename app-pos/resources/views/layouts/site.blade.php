@@ -4,255 +4,127 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'Seka Yasa POS — Layanan Konsultasi & Sistem Kasir Custom')</title>
+    <title>@yield('title', 'Tandha by SEKA GROUP — Aplikasi Kasir, Stok Cabang & Solusi POS Bisnis')</title>
+    <link rel="icon" type="image/svg+xml" href="/assets/Logo%20Tandha.svg?v=4">
+    <link rel="icon" type="image/png" sizes="192x192" href="/tandha-icon-192.png?v=4">
+    <link rel="shortcut icon" href="/favicon.ico?v=4">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        window.tailwind = {
+            config: {
+                corePlugins: {
+                    preflight: false,
+                    container: false
+                }
+            }
+        };
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="/css/tandha.css?v=12">
 
     <style>
-        :root {
-            --amber: #F7B05F;
-            --amber-hover: #E89E4A;
-            --soga: #775229;
-            --soga-dark: #583B1B;
-            --soga-tint: #F2EBE1;
-            --espresso: #1A1208;
-            --espresso-surface: #23190D;
-            --cream: #FAF7F2;
-            --cream-alt: #F3EDE4;
-            --text-primary: #1A1208;
-            --text-secondary: #524538;
-            --text-on-dark: #F7F3EC;
-            --text-on-dark-muted: #C4B5A2;
-            --line-light: rgba(119, 82, 41, 0.18);
-        }
-
         [x-cloak] { display: none !important; }
-
-        * {
-            box-sizing: border-box;
+        .swal2-container {
+            backdrop-filter: blur(4px);
+            background: rgba(13, 38, 32, 0.62) !important;
         }
-
-        body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            background-color: var(--cream);
-            color: var(--text-primary);
-            margin: 0;
+        .swal2-popup {
+            border: 1px solid rgba(13, 38, 32, 0.3) !important;
+            border-radius: 16px !important;
+            box-shadow: 0 24px 56px -12px rgba(6, 20, 16, 0.5), 0 0 0 1px rgba(13, 38, 32, 0.14) !important;
+            font-family: 'Plus Jakarta Sans', sans-serif !important;
+            outline: none !important;
         }
-
-        /* Wide Editorial Container (DESIGN_SYSTEM.md Sec 1.5 & 6.3) */
-        .sy-container {
-            width: 92%;
-            max-width: 1540px;
-            margin: 0 auto;
+        .swal2-popup:focus, .swal2-popup *:focus { outline: none !important; }
+        .swal2-styled {
+            border-radius: 8px !important;
+            font-weight: 600 !important;
+            box-shadow: none !important;
         }
-
-        /* Scroll Progress Bar */
-        #scroll-progress {
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: 2px;
-            background: var(--amber);
-            width: 0%;
-            z-index: 60;
-            transition: width 0.1s linear;
-        }
-
-        /* Typography Rules (DESIGN_SYSTEM.md Sec 3) */
-        .sy-h1 {
-            font-size: clamp(2.25rem, 3.6vw, 3.5rem);
-            font-weight: 700;
-            line-height: 1.18;
-            letter-spacing: -0.02em;
-        }
-
-        .sy-h2 {
-            font-size: clamp(1.75rem, 2.5vw, 2.4rem);
-            font-weight: 700;
-            line-height: 1.24;
-            letter-spacing: -0.015em;
-        }
-
-        .sy-h3 {
-            font-size: clamp(1.25rem, 1.5vw, 1.38rem);
-            font-weight: 700;
-            line-height: 1.30;
-        }
-
-        .sy-index {
-            font-size: 0.84rem;
-            font-weight: 600;
-            letter-spacing: 0.04em;
-        }
-
-        .sy-body-point {
-            font-size: 0.98rem;
-            font-weight: 400;
-            line-height: 1.60;
-            max-width: 560px;
-        }
-
-        /* Asymmetric Sticky Split (Pola B) */
-        .sy-split {
-            display: grid;
-            grid-template-columns: 0.72fr 1.08fr;
-            gap: 5rem;
-            justify-content: space-between;
-            align-items: start;
-        }
-
-        .sy-split-left {
-            position: sticky;
-            top: 7.5rem;
-            max-width: 440px;
-        }
-
-        .sy-split-right {
-            max-width: 720px;
-            width: 100%;
-            justify-self: end;
-        }
-
-        /* Alternating Wide Showcases (Pola C) */
-        .sy-showcase {
-            display: grid;
-            grid-template-columns: 1.15fr 0.85fr;
-            gap: 4.5rem;
-            align-items: center;
-        }
-
-        .sy-showcase.reverse {
-            grid-template-columns: 0.85fr 1.15fr;
-        }
-
-        .sy-showcase.reverse .sy-showcase-media {
-            order: 2;
-        }
-
-        .sy-showcase.reverse .sy-showcase-copy {
-            order: 1;
-        }
-
-        /* Hero Grid (Pola A) */
-        .sy-hero-grid {
-            display: grid;
-            grid-template-columns: 1.08fr 0.92fr;
-            gap: 4.5rem;
-            align-items: center;
-        }
-
-        @media (max-width: 1024px) {
-            .sy-hero-grid,
-            .sy-split,
-            .sy-showcase,
-            .sy-showcase.reverse {
-                grid-template-columns: 1fr;
-                gap: 2.5rem;
-            }
-            .sy-split-left {
-                position: static;
-                max-width: 100%;
-            }
-            .sy-split-right {
-                justify-self: start;
-                max-width: 100%;
-            }
-            .sy-showcase.reverse .sy-showcase-media,
-            .sy-showcase.reverse .sy-showcase-copy {
-                order: unset;
-            }
-        }
+        .swal2-styled:focus { box-shadow: 0 0 0 3px rgba(13, 122, 95, 0.24) !important; }
     </style>
     @stack('styles')
 </head>
 <body>
-    <div id="scroll-progress"></div>
+    <div class="scroll-progress-bar" id="scroll-progress"></div>
 
-    <!-- Navbar (Deep Espresso #1A1208) -->
-    <div x-data="siteHeaderAuth()" x-init="initAuth()">
-        <header class="sticky top-0 z-50 bg-[#1A1208]/95 backdrop-blur border-b border-[rgba(247,176,95,0.14)]">
-            <div class="sy-container h-20 flex items-center justify-between gap-4">
-                <a href="/" class="flex items-center gap-3 group shrink-0">
-                    <!-- Minimal Javanese Geometric Mark -->
-                    <svg class="w-8 h-8 text-[#F7B05F]" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <rect x="4" y="4" width="32" height="32" rx="4" stroke="currentColor" stroke-width="2"/>
-                        <path d="M20 9L31 20L20 31L9 20L20 9Z" stroke="currentColor" stroke-width="1.75"/>
-                        <circle cx="20" cy="20" r="3.5" fill="currentColor"/>
-                    </svg>
-                    <div>
-                        <span class="block text-base font-bold tracking-tight text-[#F7F3EC] leading-none">SEKA YASA</span>
-                        <span class="block text-[11px] font-medium text-[#C4B5A2] tracking-wider uppercase mt-1">POS Custom Studio</span>
-                    </div>
+    <!-- FLOATING OVAL NAVBAR (TANDHA EMERALD PANDAN) -->
+    <div x-data="siteHeaderAuth()" x-init="initAuth()" @click.outside="mobileNavOpen = false">
+        <header class="site-nav">
+            <div class="container nav-inner">
+                <a href="/" class="nav-brand" aria-label="Tandha by SEKA GROUP Beranda">
+                    <img src="/assets/Logo%20Tandha.svg" alt="Tandha" class="nav-logo-mark">
+                    <img src="/assets/tandha-text.svg" alt="Tandha by SEKA GROUP" class="nav-logo-text">
                 </a>
 
-                <!-- Main Nav Links -->
-                <nav class="hidden md:flex items-center gap-8 text-sm font-medium">
-                    <a href="/" class="{{ request()->is('/') ? 'text-[#F7B05F] font-semibold' : 'text-[#C4B5A2] hover:text-[#F7F3EC]' }} transition">Beranda</a>
-                    <a href="/projects" class="{{ request()->is('projects') ? 'text-[#F7B05F] font-semibold' : 'text-[#C4B5A2] hover:text-[#F7F3EC]' }} transition">Karya Sistem</a>
-                    <a href="/about" class="{{ request()->is('about') ? 'text-[#F7B05F] font-semibold' : 'text-[#C4B5A2] hover:text-[#F7F3EC]' }} transition">Tentang</a>
-                    <a href="/contact" class="{{ request()->is('contact') ? 'text-[#F7B05F] font-semibold' : 'text-[#C4B5A2] hover:text-[#F7F3EC]' }} transition">Konsultasi</a>
+                <nav class="nav-links" aria-label="Menu Utama">
+                    <a href="/" class="{{ request()->is('/') ? 'active' : '' }}">Beranda</a>
+                    <a href="/fitur" class="{{ request()->is('fitur') ? 'active' : '' }}">Fitur POS</a>
+                    <a href="/harga" class="{{ request()->is('harga') ? 'active' : '' }}">Harga</a>
+                    <a href="/contact" class="{{ request()->is('contact') ? 'active' : '' }}">Konsultasi</a>
                 </nav>
 
-                <!-- Dynamic Auth State: Guest vs Logged-In Identity -->
-                <div class="flex items-center gap-3">
-                    <!-- Guest Buttons -->
+                <div class="nav-actions">
                     <template x-if="!isLoggedIn">
-                        <div class="flex items-center gap-2.5">
-                            <a href="/login?redirect=/contact" class="hidden sm:inline-flex items-center px-3.5 py-2 rounded-md border border-[rgba(247,176,95,0.28)] text-xs font-semibold text-[#F7F3EC] hover:border-[#F7B05F] hover:text-[#F7B05F] transition">
-                                Konsultasi
-                            </a>
-                            <a href="/login?redirect=/client" class="inline-flex items-center px-4 py-2 rounded-md bg-[#F7B05F] hover:bg-[#E89E4A] text-[#1A1208] text-xs font-bold transition">
-                                Masuk / Daftar
-                            </a>
-                        </div>
+                        <a href="/login?redirect=/dashboard?tab=billing" class="btn btn-mint btn-sm {{ request()->is('login') ? 'active-cta' : '' }}">
+                            Masuk / Daftar
+                        </a>
                     </template>
 
-                    <!-- Logged-In Design -->
                     <template x-if="isLoggedIn">
-                        <div class="flex items-center gap-2.5">
-                            <div class="hidden sm:flex items-center gap-2.5 bg-[#23190D] border border-[rgba(247,176,95,0.42)] px-3 py-1.5 rounded-md">
-                                <div class="w-6 h-6 rounded bg-[#F7B05F] text-[#1A1208] text-xs font-bold flex items-center justify-center shrink-0" x-text="userInitial"></div>
-                                <div class="leading-tight">
-                                    <div class="flex items-center gap-1.5">
-                                        <span class="text-xs font-bold text-[#F7F3EC] max-w-[140px] truncate" x-text="user.name || 'Pengguna'"></span>
-                                        <span class="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-[#F7B05F]/20 text-[#F7B05F] border border-[#F7B05F]/30 rounded">Sedang Login</span>
-                                    </div>
-                                    <div class="text-[10px] text-[#C4B5A2] max-w-[180px] truncate" x-text="(user.business ? user.business.name : '') + (user.role ? ' • ' + user.role.toUpperCase() : '')"></div>
-                                </div>
-                            </div>
-                            <a href="/client" class="px-3.5 py-2 rounded-md bg-[#F7B05F] hover:bg-[#E89E4A] text-[#1A1208] text-xs font-bold transition">
-                                Akun Saya
+                        <div class="flex items-center gap-2" x-cloak>
+                            <span class="nav-login-badge" title="Akun aktif sedang login">
+                                <i class="dot"></i>
+                                <span x-text="user.name ? user.name.split(' ')[0] : 'Login'"></span>
+                            </span>
+                            <a href="/dashboard" class="btn btn-mint btn-sm">
+                                Dashboard Saya
                             </a>
-                            <button type="button" @click="logout()" class="px-3 py-2 rounded-md border border-[rgba(247,176,95,0.25)] text-xs font-semibold text-[#C4B5A2] hover:text-rose-300 hover:border-rose-400/50 transition">
-                                Keluar
+                            <button type="button" @click="logout()" class="nav-logout-btn" title="Keluar dari akun" aria-label="Keluar">
+                                <i data-lucide="log-out" class="w-4 h-4"></i>
                             </button>
                         </div>
                     </template>
                 </div>
+
+                <!-- Mobile Quick Action + Hamburger -->
+                <div class="nav-mobile-right">
+                    <a x-show="!isLoggedIn" href="/login?redirect=/dashboard?tab=billing" class="btn btn-mint btn-sm" style="padding: 0.42rem 0.78rem; font-size: 0.72rem;">
+                        Masuk
+                    </a>
+                    <a x-show="isLoggedIn" x-cloak href="/dashboard" class="btn btn-mint btn-sm" style="padding: 0.42rem 0.78rem; font-size: 0.72rem;">
+                        Dashboard
+                    </a>
+                    <button type="button" @click="mobileNavOpen = !mobileNavOpen" class="nav-mobile-toggle" aria-label="Buka Menu Navigasi" :aria-expanded="mobileNavOpen">
+                        <svg x-show="!mobileNavOpen" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+                        <svg x-show="mobileNavOpen" x-cloak class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
             </div>
         </header>
 
-        <!-- Active Session Strip (Visible on Public Pages when Logged In) -->
-        <div x-show="isLoggedIn" class="bg-[#23190D] border-b border-[rgba(247,176,95,0.2)] text-xs text-[#C4B5A2]" x-cloak>
-            <div class="sy-container py-2 flex flex-wrap items-center justify-between gap-2">
-                <div>
-                    <span class="text-[#F7B05F] font-bold uppercase text-[10px] tracking-wider mr-2">[SESI AKTIF]</span>
-                    Anda sedang login sebagai <b class="text-[#F7F3EC]" x-text="user.name"></b>
-                    <span x-show="user.business"> (<span x-text="user.business ? user.business.name : ''"></span>)</span>.
+        <!-- Mobile Slide-Down Drawer Menu -->
+        <div x-show="mobileNavOpen" x-transition.opacity.duration.150ms x-cloak class="nav-mobile-drawer">
+            <a href="/" @click="mobileNavOpen = false" class="{{ request()->is('/') ? 'active' : '' }}">Beranda</a>
+            <a href="/fitur" @click="mobileNavOpen = false" class="{{ request()->is('fitur') ? 'active' : '' }}">Fitur POS</a>
+            <a href="/harga" @click="mobileNavOpen = false" class="{{ request()->is('harga') ? 'active' : '' }}">Harga &amp; Paket</a>
+            <a href="/contact" @click="mobileNavOpen = false" class="{{ request()->is('contact') ? 'active' : '' }}">Konsultasi Fitur</a>
+            <div class="nav-mobile-drawer-divider"></div>
+            <template x-if="!isLoggedIn">
+                <a href="/login?redirect=/dashboard?tab=billing" class="nav-mobile-cta">Masuk / Daftar Bisnis →</a>
+            </template>
+            <template x-if="isLoggedIn">
+                <div class="space-y-2">
+                    <a href="/dashboard" class="nav-mobile-cta">Buka Dashboard Saya →</a>
+                    <button type="button" @click="logout()" class="nav-mobile-logout">Keluar Akun (<span x-text="user.name ? user.name.split(' ')[0] : ''"></span>)</button>
                 </div>
-                <div class="flex items-center gap-4 font-semibold text-[11px]">
-                    <a href="/client" class="text-[#F7B05F] hover:underline">Halaman Akun & Sewa</a>
-                    <a href="/contact" class="text-[#F7F3EC] hover:text-[#F7B05F]">Konsultasi Custom</a>
-                    <a x-show="user.role !== 'owner' || (user.business && user.business.service_type === 'template_saas')" href="/pos" class="text-[#F7F3EC] hover:text-[#F7B05F]">Layar Kasir POS</a>
-                    <a x-show="user.role === 'superadmin' || user.role === 'admin' || (user.business && user.business.service_type === 'template_saas')" href="/dashboard" class="text-[#F7F3EC] hover:text-[#F7B05F]">Dashboard</a>
-                </div>
-            </div>
+            </template>
         </div>
     </div>
 
@@ -260,45 +132,66 @@
         @yield('content')
     </main>
 
-    <!-- Footer (Deep Espresso #1A1208) -->
-    <footer class="bg-[#1A1208] text-[#C4B5A2] border-t border-[rgba(247,176,95,0.16)] py-14">
-        <div class="sy-container flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
-            <div>
-                <div class="flex items-center gap-2.5 text-[#F7F3EC] font-bold text-base">
-                    <span>SEKA YASA — POS Custom Studio</span>
+    <!-- 4-COLUMN POS FOOTER -->
+    <footer class="site-footer">
+        <div class="container">
+            <div class="footer-top">
+                <div>
+                    <a href="/" class="nav-brand">
+                        <img src="/assets/Logo%20Tandha.svg" alt="Tandha" class="nav-logo-mark">
+                        <img src="/assets/tandha-text.svg" alt="Tandha by SEKA GROUP" class="nav-logo-text">
+                    </a>
+                    <p class="footer-desc">
+                        Tandha by SEKA GROUP — Aplikasi kasir Point of Sale, manajemen stok multi-outlet, dan layanan konsultasi alur POS bisnis.
+                    </p>
                 </div>
-                <p class="text-sm text-[#C4B5A2] mt-2 max-w-md">
-                    Konsultasi alur operasional, pengembangan POS custom sesuai proses bisnis, serta infrastruktur produksi terkelola.
-                </p>
+
+                <div class="footer-col">
+                    <h4>Produk Tandha</h4>
+                    <ul>
+                        <li><a href="/">Beranda</a></li>
+                        <li><a href="/fitur">Fitur Aplikasi POS</a></li>
+                        <li><a href="/harga">Harga &amp; Paket Sewa</a></li>
+                        <li><a href="/about">Tentang Tandha</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-col">
+                    <h4>Modul POS</h4>
+                    <ul>
+                        <li><a href="/fitur#kasir">Terminal Kasir &amp; Shift</a></li>
+                        <li><a href="/fitur#stok">Stok Multi-Cabang &amp; HPP</a></li>
+                        <li><a href="/fitur#akun">Portal Akun Terisolasi</a></li>
+                        <li><a href="/contact">Konsultasi &amp; Request Fitur</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-col">
+                    <h4>Portal Akun</h4>
+                    <ul>
+                        <li><a href="/client">Halaman Akun Klien</a></li>
+                        <li><a href="/pos">Terminal Kasir POS</a></li>
+                        <li><a href="/dashboard">Dashboard Pemilik</a></li>
+                        <li><a href="/login?redirect=/client">Masuk / Daftar Bisnis</a></li>
+                    </ul>
+                </div>
             </div>
 
-            <div class="flex flex-wrap gap-6 text-xs font-medium">
-                <a href="/" class="hover:text-[#F7B05F] transition">Beranda</a>
-                <a href="/projects" class="hover:text-[#F7B05F] transition">Karya Sistem</a>
-                <a href="/about" class="hover:text-[#F7B05F] transition">Tentang</a>
-                <a href="/contact" class="hover:text-[#F7B05F] transition">Konsultasi</a>
-                <span class="text-[#775229]">|</span>
-                <a href="/pos" class="text-[#F7B05F] hover:underline">Layar Kasir POS</a>
-                <a href="/dashboard" class="text-[#F7B05F] hover:underline">Dashboard Owner</a>
-                <a href="/client" class="text-[#F7B05F] hover:underline">Akun & Konsultasi Klien</a>
+            <div class="footer-bottom">
+                <span>© 2026 Tandha POS — Product by SEKA GROUP, Surabaya.</span>
+                <span>Point of Sale &amp; Multi-Outlet Inventory Platform</span>
             </div>
-        </div>
-        <div class="sy-container mt-10 pt-6 border-t border-[rgba(247,176,95,0.12)] flex flex-col sm:flex-row justify-between text-xs text-[#C4B5A2]/70 gap-2">
-            <span>© 2026 Seka Yasa POS Custom Development Service.</span>
-            <span>Arsitektur Terisolasi Per Klien • Laravel & MySQL Production Standard</span>
         </div>
     </footer>
 
     <script>
         function siteHeaderAuth() {
             return {
+                mobileNavOpen: false,
                 token: localStorage.getItem('pos_token') || '',
                 user: JSON.parse(localStorage.getItem('pos_user') || '{}'),
                 get isLoggedIn() {
                     return Boolean(this.token && this.user && this.user.id);
-                },
-                get userInitial() {
-                    return this.user && this.user.name ? this.user.name.charAt(0).toUpperCase() : 'U';
                 },
                 async initAuth() {
                     if (!this.token) return;
@@ -339,15 +232,66 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            if (window.lucide) {
-                window.lucide.createIcons();
+            if (window.lucide) window.lucide.createIcons();
+
+            const megaWrap = document.getElementById('nav-mega-wrap');
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && megaWrap) megaWrap.classList.remove('mega-open');
+            });
+
+            const revealEls = document.querySelectorAll('.reveal-on-scroll');
+            if ('IntersectionObserver' in window) {
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach((entry) => {
+                        if (entry.isIntersecting) entry.target.classList.add('is-visible');
+                    });
+                }, { threshold: 0.12, rootMargin: '0px 0px -30px 0px' });
+                revealEls.forEach((el) => observer.observe(el));
+            } else {
+                revealEls.forEach((el) => el.classList.add('is-visible'));
             }
-        });
-        window.addEventListener('scroll', () => {
-            const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-            const scrolled = docHeight > 0 ? (window.scrollY / docHeight) * 100 : 0;
-            const bar = document.getElementById('scroll-progress');
-            if (bar) bar.style.width = scrolled + '%';
+
+            const nav = document.querySelector('.site-nav');
+            const progressBar = document.getElementById('scroll-progress');
+            function onScroll() {
+                const scrollY = window.scrollY;
+                if (nav) nav.classList.toggle('nav-scrolled', scrollY > 40);
+                if (progressBar) {
+                    const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+                    const pct = docHeight > 0 ? Math.min(100, (scrollY / docHeight) * 100) : 0;
+                    progressBar.style.width = `${pct}%`;
+                }
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+
+            // Hero Mint Cursor Spotlight
+            const hero = document.getElementById('hero-stage');
+            const glow = document.getElementById('hero-cursor-glow');
+            if (hero && glow) {
+                hero.addEventListener('mousemove', (e) => {
+                    const rect = hero.getBoundingClientRect();
+                    const x = ((e.clientX - rect.left) / rect.width) * 100;
+                    const y = ((e.clientY - rect.top) / rect.height) * 100;
+                    glow.style.setProperty('--mx', `${x.toFixed(2)}%`);
+                    glow.style.setProperty('--my', `${y.toFixed(2)}%`);
+                });
+            }
+
+            const filterBtns = document.querySelectorAll('[data-case-filter]');
+            const filterItems = document.querySelectorAll('[data-case-cat]');
+            if (filterBtns.length) {
+                filterBtns.forEach((btn) => {
+                    btn.addEventListener('click', () => {
+                        const cat = btn.getAttribute('data-case-filter');
+                        filterBtns.forEach((b) => b.classList.toggle('active', b === btn));
+                        filterItems.forEach((item) => {
+                            const match = cat === 'all' || item.getAttribute('data-case-cat') === cat;
+                            item.classList.toggle('hidden', !match);
+                        });
+                    });
+                });
+            }
         });
     </script>
     @stack('scripts')

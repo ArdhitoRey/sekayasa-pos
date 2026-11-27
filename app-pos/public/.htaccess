@@ -5,6 +5,14 @@
 
     RewriteEngine On
 
+    # Block dot-files (.env, .git, .htaccess) and sensitive composer/log artifacts
+    RewriteRule ^\. - [F,L]
+    RewriteRule ^(composer\.(json|lock)|package(-lock)?\.json|phpunit\.xml)$ - [F,L]
+
+    # Mitigate Windows PHP-CGI argument injection (CVE-2024-4577 pattern)
+    RewriteCond %{QUERY_STRING} (^|&)- [NC]
+    RewriteRule ^ - [F,L]
+
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]

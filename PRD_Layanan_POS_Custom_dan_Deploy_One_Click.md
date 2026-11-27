@@ -64,7 +64,7 @@ Di sisi penyedia layanan, diperlukan portal internal untuk mengelola lead, konsu
 Layanan memiliki dua komponen komersial yang harus dibedakan.
 
 | Komponen | Jenis biaya | Waktu pembayaran | Cakupan |
-|---|---|---|---|
+|---|---|---|---|       
 | Konsultasi awal | Gratis atau berbayar sesuai kebijakan usaha | Sebelum/saat konsultasi bila berbayar | Diskusi awal, pemahaman masalah, dan penentuan langkah discovery |
 | Pengembangan POS custom | Biaya satu kali (one-time) | Lunas setelah proposal dan scope disetujui, sebelum development | Analisis rinci, desain, coding, testing, UAT, dokumentasi, dan go-live sesuai scope |
 | Layanan bulanan | Berulang setiap bulan | Mulai saat layanan produksi aktif sesuai tanggal kontrak | Hosting, monitoring, backup, maintenance, support, dan SLA yang disepakati |

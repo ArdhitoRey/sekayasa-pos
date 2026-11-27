@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\PosController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ShiftController;
+use App\Http\Controllers\Api\StaffController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -16,8 +17,15 @@ use Illuminate\Support\Facades\Route;
 | Public Routes
 |--------------------------------------------------------------------------
 */
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/email/send-verification', [AuthController::class, 'sendRegistrationVerification'])->middleware('throttle:30,1');
+Route::post('/antibot/challenge', [AuthController::class, 'createAntibotChallenge'])->middleware('throttle:60,1');
+Route::post('/antibot/verify', [AuthController::class, 'verifyAntibotChallenge'])->middleware('throttle:30,1');
+Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:20,1');
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:20,1');
+Route::post('/password/forgot', [AuthController::class, 'forgotPassword'])->middleware('throttle:15,1');
+Route::post('/password/reset', [AuthController::class, 'resetPassword'])->middleware('throttle:15,1');
+Route::get('/auth/google/exchange/{nonce}', [AuthController::class, 'exchangeGoogleToken'])->middleware('throttle:20,1');
+Route::post('/payments/midtrans-callback', [\App\Http\Controllers\Api\ClientAccountController::class, 'handleMidtransCallback'])->middleware('throttle:60,1');
 
 /*
 |--------------------------------------------------------------------------
@@ -29,10 +37,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    // Outlets (FR-007, FR-008)
+    // Outlets & Staff Management (Owner exclusive for mutations)
     Route::get('/outlets', [OutletController::class, 'index']);
     Route::post('/outlets', [OutletController::class, 'store']);
     Route::put('/outlets/{id}', [OutletController::class, 'update']);
+
+    Route::get('/staff', [StaffController::class, 'index']);
+    Route::post('/staff', [StaffController::class, 'store']);
+    Route::put('/staff/{id}', [StaffController::class, 'update']);
+    Route::delete('/staff/{id}', [StaffController::class, 'destroy']);
+    Route::put('/business/profile', [StaffController::class, 'updateBusinessProfile']);
+    Route::put('/business/settings', [StaffController::class, 'updateFeatureSettings']);
 
     // Categories (FR-013)
     Route::get('/categories', [CategoryController::class, 'index']);
@@ -43,6 +58,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Products (FR-009 s/d FR-015)
     Route::get('/products', [ProductController::class, 'index']);
     Route::post('/products', [ProductController::class, 'store']);
+    Route::post('/products/{id}', [ProductController::class, 'update']);
     Route::put('/products/{id}', [ProductController::class, 'update']);
     Route::delete('/products/{id}', [ProductController::class, 'destroy']);
     Route::get('/products/barcode/{barcode}', [ProductController::class, 'findByBarcode']);
@@ -82,13 +98,19 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/overview', [\App\Http\Controllers\Api\ClientAccountController::class, 'overview']);
         Route::post('/rent-template', [\App\Http\Controllers\Api\ClientAccountController::class, 'rentTemplate']);
         Route::get('/payments/{paymentId}/status', [\App\Http\Controllers\Api\ClientAccountController::class, 'checkPaymentStatus']);
+        Route::get('/payments/{paymentId}/receipt', [\App\Http\Controllers\Api\ClientAccountController::class, 'paymentReceipt']);
         Route::post('/consultations', [\App\Http\Controllers\Api\ClientAccountController::class, 'requestConsultation']);
         Route::post('/uat/{testCaseId}', [\App\Http\Controllers\Api\ClientAccountController::class, 'submitOwnUat']);
     });
 
-    // Super Admin Platform Management (Verifikasi Langganan & Pantau Konsultasi)
+    // Super Admin Platform Management (Monitoring Semua Klien, Aktivasi Uji Coba & Pelacakan Error)
     Route::prefix('admin')->group(function () {
         Route::get('/platform-overview', [\App\Http\Controllers\Api\AdminController::class, 'overview']);
+        Route::get('/businesses/{id}', [\App\Http\Controllers\Api\AdminController::class, 'businessDetail']);
+        Route::post('/businesses/{id}/extend-subscription', [\App\Http\Controllers\Api\AdminController::class, 'extendSubscription']);
         Route::post('/subscription-payments/{id}/verify', [\App\Http\Controllers\Api\AdminController::class, 'verifySubscriptionPayment']);
+        Route::post('/consultations/{id}/whatsapp-status', [\App\Http\Controllers\Api\AdminController::class, 'updateConsultationWhatsappStatus']);
+        Route::post('/businesses/{id}/toggle-status', [\App\Http\Controllers\Api\AdminController::class, 'toggleBusinessStatus']);
+        Route::delete('/businesses/{id}', [\App\Http\Controllers\Api\AdminController::class, 'destroyBusiness']);
     });
 });

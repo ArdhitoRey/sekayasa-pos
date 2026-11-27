@@ -1,24 +1,38 @@
 {
-  "name": "POS Kasir Management System",
-  "short_name": "POS Kasir",
-  "description": "Aplikasi Point of Sale Kasir Multi-Tenant",
-  "start_url": "/pos",
+  "id": "/pos?app=kasir&v=4",
+  "name": "Tandha POS Kasir",
+  "short_name": "Tandha Kasir",
+  "description": "Aplikasi Point of Sale Kasir Multi-Outlet — Tandha by SEKA GROUP",
+  "start_url": "/pos?app=kasir",
+  "scope": "/",
   "display": "standalone",
-  "orientation": "portrait-primary",
-  "background_color": "#1A1208",
-  "theme_color": "#1A1208",
+  "orientation": "any",
+  "background_color": "#0D2620",
+  "theme_color": "#0D2620",
   "icons": [
     {
-      "src": "/icon-192.png",
+      "src": "/tandha-icon-192.png?v=4",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "/icon-512.png",
+      "src": "/tandha-icon-192.png?v=4",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/tandha-icon-512.png?v=4",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/tandha-icon-512.png?v=4",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

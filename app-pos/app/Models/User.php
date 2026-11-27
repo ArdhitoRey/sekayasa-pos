@@ -16,7 +16,12 @@ class User extends Authenticatable
         'outlet_id',
         'name',
         'email',
+        'google_id',
+        'avatar',
+        'email_verified_at',
         'phone',
+        'nik',
+        'job_title',
         'password',
         'role', // superadmin, owner, admin, cashier
         'is_active',
@@ -64,6 +69,22 @@ class User extends Authenticatable
     public function isCashier(): bool
     {
         return $this->role === 'cashier';
+    }
+
+    /**
+     * Owner can always handle everything Admin handles (Admin is optional).
+     */
+    public function canManageOperations(): bool
+    {
+        return in_array($this->role, ['owner', 'admin'], true);
+    }
+
+    /**
+     * Exclusive to Business Owner (staff/outlet creation, billing, profit margins, legal profile).
+     */
+    public function canManageBusiness(): bool
+    {
+        return $this->role === 'owner';
     }
 
     public function activeShift()

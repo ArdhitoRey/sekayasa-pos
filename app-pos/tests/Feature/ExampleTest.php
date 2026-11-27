@@ -12,11 +12,12 @@ class ExampleTest extends TestCase
      */
     public function test_the_application_returns_a_successful_response(): void
     {
-        foreach (['/', '/projects', '/about', '/contact', '/login', '/client', '/pos', '/dashboard'] as $route) {
+        foreach (['/', '/fitur', '/harga', '/about', '/contact', '/login', '/client', '/pos', '/dashboard'] as $route) {
             $response = $this->get($route);
             $response->assertStatus(200);
         }
 
+        $this->get('/projects')->assertStatus(404);
         $this->get('/portal')->assertStatus(404);
     }
 }

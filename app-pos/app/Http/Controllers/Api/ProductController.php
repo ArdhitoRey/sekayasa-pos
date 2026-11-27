@@ -3,11 +3,16 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
+use App\Models\Category;
 use App\Models\Inventory;
+use App\Models\Outlet;
 use App\Models\Product;
 use App\Models\StockMovement;
+use App\Models\Unit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class ProductController extends Controller
 {
@@ -18,7 +23,13 @@ class ProductController extends Controller
     {
         $user = $request->user();
         $businessId = $user->business_id;
+        if (!$businessId) {
+            return response()->json(['status' => 'error', 'message' => 'Akses produk hanya untuk akun bisnis.'], 403);
+        }
         $outletId = $request->query('outlet_id', $user->outlet_id);
+        if ($outletId) {
+            Outlet::where('business_id', $businessId)->findOrFail($outletId);
+        }
 
         $query = Product::where('business_id', $businessId)
             ->with(['category', 'unit'])
@@ -63,6 +74,29 @@ class ProductController extends Controller
     public function store(Request $request)
     {
         $user = $request->user();
+        if (!$user->canManageOperations()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Hanya Pemilik (Owner) atau Admin Toko yang dapat menambah produk.',
+            ], 403);
+        }
+        if ($user->role === 'admin' && $user->business) {
+            $settings = $user->business->resolvedFeatureSettings();
+            if (empty($settings['admin_manage_products'])) {
+                return response()->json(['status' => 'error', 'message' => 'Pemilik bisnis menonaktifkan akses tambah produk untuk Admin.'], 403);
+            }
+        }
+
+        $business = $user->business;
+        $limits = $business ? $business->planLimits() : ['max_products' => 150, 'plan_name' => 'Default'];
+        $currentCount = Product::where('business_id', $user->business_id)->where('is_active', true)->count();
+        if ($currentCount >= $limits['max_products']) {
+            return response()->json([
+                'status' => 'error',
+                'message' => "Batas maksimal produk untuk paket {$limits['plan_name']} ({$limits['max_products']} produk) telah tercapai.",
+            ], 403);
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'category_id' => 'nullable|exists:categories,id',
@@ -74,9 +108,25 @@ class ProductController extends Controller
             'min_stock_alert' => 'nullable|integer|min:0',
             'initial_stock' => 'nullable|integer|min:0',
             'outlet_id' => 'nullable|exists:outlets,id',
+            'image' => 'required|image|mimes:jpg,jpeg,png,webp|max:2048',
+        ], [
+            'image.required' => 'Gambar produk wajib diunggah agar kasir mudah mengenali menu.',
+            'image.image' => 'File produk harus berupa gambar (JPG, PNG, atau WEBP).',
         ]);
 
-        return DB::transaction(function () use ($user, $validated) {
+        if (!empty($validated['outlet_id'])) {
+            Outlet::where('business_id', $user->business_id)->findOrFail($validated['outlet_id']);
+        }
+        if (!empty($validated['category_id'])) {
+            Category::where('business_id', $user->business_id)->findOrFail($validated['category_id']);
+        }
+        if (!empty($validated['unit_id'])) {
+            Unit::where('business_id', $user->business_id)->findOrFail($validated['unit_id']);
+        }
+
+        $imagePath = $request->file('image')->store('products', 'public');
+
+        return DB::transaction(function () use ($user, $validated, $imagePath, $request) {
             $product = Product::create([
                 'business_id' => $user->business_id,
                 'category_id' => $validated['category_id'] ?? null,
@@ -87,6 +137,7 @@ class ProductController extends Controller
                 'buy_price' => $validated['buy_price'],
                 'sell_price' => $validated['sell_price'],
                 'min_stock_alert' => $validated['min_stock_alert'] ?? 5,
+                'image_path' => $imagePath,
                 'is_active' => true,
             ]);
 
@@ -111,6 +162,16 @@ class ProductController extends Controller
                 ]);
             }
 
+            ActivityLog::record(
+                $user->business_id,
+                $user->id,
+                'product_created',
+                'Product',
+                $product->id,
+                ['name' => $product->name, 'sell_price' => (float) $product->sell_price],
+                $request->ip()
+            );
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Produk berhasil ditambahkan',
@@ -125,21 +186,46 @@ class ProductController extends Controller
     public function update(Request $request, $id)
     {
         $user = $request->user();
+        if (!$user->canManageOperations()) {
+            return response()->json(['status' => 'error', 'message' => 'Hanya Owner atau Admin Toko yang dapat mengubah produk.'], 403);
+        }
+        if ($user->role === 'admin' && $user->business) {
+            $settings = $user->business->resolvedFeatureSettings();
+            if (empty($settings['admin_manage_products'])) {
+                return response()->json(['status' => 'error', 'message' => 'Pemilik bisnis menonaktifkan akses ubah produk untuk Admin.'], 403);
+            }
+        }
+
         $product = Product::where('business_id', $user->business_id)->findOrFail($id);
 
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => 'sometimes|required|string|max:255',
             'category_id' => 'nullable|exists:categories,id',
             'unit_id' => 'nullable|exists:units,id',
             'sku' => 'nullable|string|max:50',
             'barcode' => 'nullable|string|max:50',
-            'buy_price' => 'required|numeric|min:0',
-            'sell_price' => 'required|numeric|min:0',
+            'buy_price' => 'sometimes|required|numeric|min:0',
+            'sell_price' => 'sometimes|required|numeric|min:0',
             'min_stock_alert' => 'nullable|integer|min:0',
             'is_active' => 'boolean',
+            'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
         ]);
 
-        $product->update($validated);
+        $data = collect($validated)->except(['image'])->toArray();
+        if (!empty($validated['category_id'])) {
+            Category::where('business_id', $user->business_id)->findOrFail($validated['category_id']);
+        }
+        if (!empty($validated['unit_id'])) {
+            Unit::where('business_id', $user->business_id)->findOrFail($validated['unit_id']);
+        }
+        if ($request->hasFile('image')) {
+            if ($product->image_path && !str_starts_with($product->image_path, '/assets/')) {
+                Storage::disk('public')->delete($product->image_path);
+            }
+            $data['image_path'] = $request->file('image')->store('products', 'public');
+        }
+
+        $product->update($data);
 
         return response()->json([
             'status' => 'success',
@@ -154,6 +240,16 @@ class ProductController extends Controller
     public function destroy(Request $request, $id)
     {
         $user = $request->user();
+        if (!$user->canManageOperations()) {
+            return response()->json(['status' => 'error', 'message' => 'Hanya Owner atau Admin Toko yang dapat mengarsipkan produk.'], 403);
+        }
+        if ($user->role === 'admin' && $user->business) {
+            $settings = $user->business->resolvedFeatureSettings();
+            if (empty($settings['admin_manage_products'])) {
+                return response()->json(['status' => 'error', 'message' => 'Pemilik bisnis menonaktifkan akses arsip produk untuk Admin.'], 403);
+            }
+        }
+
         $product = Product::where('business_id', $user->business_id)->findOrFail($id);
         $product->update(['is_active' => false]);
 
@@ -169,7 +265,13 @@ class ProductController extends Controller
     public function findByBarcode(Request $request, $barcode)
     {
         $user = $request->user();
+        if (!$user->business_id) {
+            return response()->json(['status' => 'error', 'message' => 'Akses produk hanya untuk akun bisnis.'], 403);
+        }
         $outletId = $request->query('outlet_id', $user->outlet_id);
+        if ($outletId) {
+            Outlet::where('business_id', $user->business_id)->findOrFail($outletId);
+        }
 
         $product = Product::where('business_id', $user->business_id)
             ->where('barcode', $barcode)

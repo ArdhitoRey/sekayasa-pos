@@ -11,6 +11,9 @@ class CustomerController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
+        if (!$user->business_id) {
+            return response()->json(['status' => 'error', 'message' => 'Data pelanggan hanya tersedia untuk akun bisnis.'], 403);
+        }
         $customers = Customer::where('business_id', $user->business_id)
             ->withCount('transactions')
             ->latest()
@@ -25,6 +28,9 @@ class CustomerController extends Controller
     public function store(Request $request)
     {
         $user = $request->user();
+        if (!$user->business_id) {
+            return response()->json(['status' => 'error', 'message' => 'Hanya akun bisnis yang dapat menambah pelanggan.'], 403);
+        }
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'phone' => 'nullable|string|max:20',

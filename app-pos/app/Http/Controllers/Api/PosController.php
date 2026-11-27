@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
 use App\Models\Business;
 use App\Models\CashierShift;
 use App\Models\Customer;
 use App\Models\Inventory;
+use App\Models\Outlet;
 use App\Models\Payment;
 use App\Models\Product;
 use App\Models\StockMovement;
@@ -18,12 +20,30 @@ use Illuminate\Support\Str;
 
 class PosController extends Controller
 {
+    private function ensureCashier(Request $request)
+    {
+        $user = $request->user();
+        if (!$user || $user->role !== 'cashier') {
+            return response()->json([
+                'status' => 'error',
+                'code' => 'CASHIER_ROLE_REQUIRED',
+                'message' => 'Transaksi kasir (Checkout / Hold / Void) hanya dapat dilakukan oleh akun Kasir (Cashier). Akun Owner hanya dapat membuka Mode Preview (Read-Only).',
+            ], 403);
+        }
+
+        return null;
+    }
+
     /**
      * Process POS Checkout (FR-021 s/d FR-030)
      * Includes atomic stock locking & shift accumulation
      */
     public function checkout(Request $request)
     {
+        if ($resp = $this->ensureCashier($request)) {
+            return $resp;
+        }
+
         $user = $request->user();
         $businessId = $user->business_id;
         $outletId = $request->input('outlet_id', $user->outlet_id);
@@ -44,15 +64,48 @@ class PosController extends Controller
             'notes' => 'nullable|string',
         ]);
 
-        return DB::transaction(function () use ($user, $businessId, $outletId, $validated) {
-            $business = Business::findOrFail($businessId);
-            
-            // Check active shift for cashier
-            $shift = CashierShift::where('outlet_id', $outletId)
-                ->where('user_id', $user->id)
-                ->where('status', 'open')
-                ->latest('opened_at')
-                ->first();
+        $outlet = Outlet::where('business_id', $businessId)->findOrFail($outletId);
+        if (!empty($validated['customer_id'])) {
+            Customer::where('business_id', $businessId)->findOrFail($validated['customer_id']);
+        }
+        $business = Business::findOrFail($businessId);
+        $effectiveSettings = $business->resolvedFeatureSettings($outlet);
+
+        if ($user->role === 'cashier' && empty($effectiveSettings['pos_allow_discount']) && (float) ($validated['discount_amount'] ?? 0) > 0) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Pemilik bisnis menonaktifkan fitur pemberian diskon untuk kasir pada outlet ini.',
+            ], 403);
+        }
+
+        // Require an open cashier shift when enabled (default true) so every transaction reconciles to a cash drawer
+        $activeShift = CashierShift::where('outlet_id', $outletId)
+            ->where('user_id', $user->id)
+            ->where('status', 'open')
+            ->latest('opened_at')
+            ->first();
+
+        if (!empty($effectiveSettings['pos_require_shift']) && !$activeShift) {
+            ActivityLog::record(
+                $businessId,
+                $user->id,
+                'pos_checkout_failed',
+                'Outlet',
+                (int) $outletId,
+                ['error' => 'Shift kasir belum dibuka sebelum checkout.'],
+                $request->ip()
+            );
+
+            return response()->json([
+                'status' => 'error',
+                'code' => 'SHIFT_NOT_OPEN',
+                'message' => 'Shift kasir belum dibuka. Silakan klik "Buka Shift" dan isi kas awal laci terlebih dahulu agar data transaksi dan kas tercatat lengkap.',
+            ], 422);
+        }
+
+        try {
+            return DB::transaction(function () use ($user, $businessId, $outletId, $validated, $request, $activeShift, $outlet, $business) {
+                $shift = $activeShift;
 
             // Calculate Subtotal & Verify Stock atomically
             $subtotal = 0;
@@ -65,15 +118,20 @@ class PosController extends Controller
                     ->lockForUpdate()
                     ->first();
 
-                $product = Product::findOrFail($itemData['product_id']);
+                $product = Product::where('business_id', $businessId)->findOrFail($itemData['product_id']);
 
                 if (!$inventory || $inventory->stock_quantity < $itemData['quantity']) {
                     $available = $inventory ? $inventory->stock_quantity : 0;
                     throw new \Exception("Stok tidak mencukupi untuk '{$product->name}'. Tersedia: {$available}, Diminta: {$itemData['quantity']}");
                 }
 
-                $itemDiscount = $itemData['discount_amount'] ?? 0;
-                $lineSubtotal = ($product->sell_price * $itemData['quantity']) - $itemDiscount;
+                $rawItemDiscount = (float) ($itemData['discount_amount'] ?? 0);
+                if ($user->role === 'cashier' && empty($effectiveSettings['pos_allow_discount']) && $rawItemDiscount > 0) {
+                    throw new \Exception('Pemilik bisnis menonaktifkan fitur pemberian diskon untuk kasir pada outlet ini.');
+                }
+                $lineGross = (float) $product->sell_price * (int) $itemData['quantity'];
+                $itemDiscount = min(max(0, $rawItemDiscount), $lineGross);
+                $lineSubtotal = $lineGross - $itemDiscount;
                 $subtotal += $lineSubtotal;
 
                 $itemsToProcess[] = [
@@ -85,18 +143,22 @@ class PosController extends Controller
                 ];
             }
 
-            // Calculate Bill Discount
+            // Calculate Bill Discount (clamped against negative / >100% abuse)
             $discountTotal = 0;
             if (!empty($validated['discount_type']) && !empty($validated['discount_amount'])) {
                 if ($validated['discount_type'] === 'percent') {
-                    $discountTotal = ($subtotal * $validated['discount_amount']) / 100;
+                    $pct = min(100, max(0, (float) $validated['discount_amount']));
+                    $discountTotal = ($subtotal * $pct) / 100;
                 } else {
-                    $discountTotal = min($validated['discount_amount'], $subtotal);
+                    $discountTotal = min(max(0, (float) $validated['discount_amount']), $subtotal);
                 }
             }
+            $discountTotal = min($discountTotal, $subtotal);
 
-            // Calculate Tax
-            $taxPercentage = $validated['tax_percentage'] ?? ($business->tax_percentage ?? 0);
+            // Calculate Tax strictly from authoritative Business / Branch rule to prevent client tax tampering
+            $taxPercentage = $user->role === 'cashier'
+                ? (float) $outlet->effectiveTaxPercentage($business)
+                : min(100, max(0, (float) ($validated['tax_percentage'] ?? $outlet->effectiveTaxPercentage($business))));
             $taxableAmount = max(0, $subtotal - $discountTotal);
             $taxAmount = ($taxableAmount * $taxPercentage) / 100;
             $totalAmount = round($taxableAmount + $taxAmount);
@@ -189,6 +251,22 @@ class PosController extends Controller
                 }
             }
 
+            ActivityLog::record(
+                $businessId,
+                $user->id,
+                'pos_checkout',
+                'Transaction',
+                $transaction->id,
+                [
+                    'invoice_number' => $transaction->invoice_number,
+                    'outlet_id' => (int) $outletId,
+                    'payment_method' => $validated['payment_method'],
+                    'items_count' => count($itemsToProcess),
+                    'total_amount' => (float) $totalAmount,
+                ],
+                $request->ip()
+            );
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Transaksi berhasil diproses',
@@ -203,6 +281,8 @@ class PosController extends Controller
                         'outlet_phone' => $transaction->outlet->phone,
                         'cashier_name' => $user->name,
                         'customer_name' => $transaction->customer ? $transaction->customer->name : 'Pelanggan Umum',
+                        'customer_phone' => $transaction->customer ? $transaction->customer->phone : null,
+                        'notes' => $transaction->notes,
                         'items' => $transaction->items->map(function ($it) {
                             return [
                                 'name' => $it->product_name,
@@ -216,13 +296,33 @@ class PosController extends Controller
                         'tax_amount' => $taxAmount,
                         'total_amount' => $totalAmount,
                         'payment_method' => strtoupper($validated['payment_method']),
+                        'reference_number' => $payment->reference_number,
                         'amount_paid' => $amountPaid,
                         'change_amount' => $changeAmount,
-                        'footer' => $business->receipt_footer,
+                        'tax_percentage' => (float) $taxPercentage,
+                        'receipt_header' => $outlet->receipt_header,
+                        'footer' => $outlet->effectiveReceiptFooter($business),
                     ],
                 ],
             ], 201);
-        });
+            });
+        } catch (\Throwable $e) {
+            ActivityLog::record(
+                $businessId,
+                $user->id,
+                'pos_checkout_failed',
+                'Outlet',
+                (int) $outletId,
+                [
+                    'error' => mb_substr($e->getMessage(), 0, 260),
+                    'payment_method' => $validated['payment_method'] ?? null,
+                    'items_count' => count($validated['items'] ?? []),
+                ],
+                $request->ip()
+            );
+
+            throw $e;
+        }
     }
 
     /**
@@ -230,6 +330,10 @@ class PosController extends Controller
      */
     public function holdTransaction(Request $request)
     {
+        if ($resp = $this->ensureCashier($request)) {
+            return $resp;
+        }
+
         $user = $request->user();
         $validated = $request->validate([
             'outlet_id' => 'required|exists:outlets,id',
@@ -237,6 +341,11 @@ class PosController extends Controller
             'items' => 'required|array|min:1',
             'notes' => 'nullable|string',
         ]);
+
+        Outlet::where('business_id', $user->business_id)->findOrFail($validated['outlet_id']);
+        if (!empty($validated['customer_id'])) {
+            Customer::where('business_id', $user->business_id)->findOrFail($validated['customer_id']);
+        }
 
         $invoiceNumber = "HOLD-" . strtoupper(Str::random(6));
 
@@ -269,6 +378,9 @@ class PosController extends Controller
     {
         $user = $request->user();
         $outletId = $request->query('outlet_id', $user->outlet_id);
+        if ($outletId) {
+            Outlet::where('business_id', $user->business_id)->findOrFail($outletId);
+        }
 
         $helds = Transaction::where('business_id', $user->business_id)
             ->where('outlet_id', $outletId)
@@ -285,9 +397,16 @@ class PosController extends Controller
     /**
      * Resume / Cancel Held Transaction (FR-027)
      */
-    public function resumeHeld($id)
+    public function resumeHeld(Request $request, $id)
     {
-        $transaction = Transaction::where('payment_status', 'held')->findOrFail($id);
+        if ($resp = $this->ensureCashier($request)) {
+            return $resp;
+        }
+
+        $user = $request->user();
+        $transaction = Transaction::where('business_id', $user->business_id)
+            ->where('payment_status', 'held')
+            ->findOrFail($id);
         $data = json_decode($transaction->notes, true);
         $transaction->delete(); // Remove hold entry
 
@@ -304,18 +423,21 @@ class PosController extends Controller
     {
         $user = $request->user();
         $outletId = $request->query('outlet_id', $user->outlet_id);
+        if ($outletId) {
+            Outlet::where('business_id', $user->business_id)->findOrFail($outletId);
+        }
 
         $query = Transaction::where('business_id', $user->business_id)
             ->where('outlet_id', $outletId)
             ->where('payment_status', '!=', 'held')
-            ->with(['items', 'payment', 'customer', 'cashier'])
+            ->with(['items', 'payment', 'customer', 'cashier', 'outlet'])
             ->latest();
 
         if ($date = $request->query('date')) {
             $query->whereDate('created_at', $date);
         }
 
-        $transactions = $query->paginate(20);
+        $transactions = $query->paginate(100);
 
         return response()->json([
             'status' => 'success',
@@ -326,9 +448,10 @@ class PosController extends Controller
     /**
      * Transaction Detail (FR-033)
      */
-    public function detail($id)
+    public function detail(Request $request, $id)
     {
-        $transaction = Transaction::with(['items', 'payment', 'customer', 'outlet', 'cashier'])
+        $transaction = Transaction::where('business_id', $request->user()->business_id)
+            ->with(['items', 'payment', 'customer', 'outlet', 'cashier'])
             ->findOrFail($id);
 
         return response()->json([
@@ -342,15 +465,29 @@ class PosController extends Controller
      */
     public function voidTransaction(Request $request, $id)
     {
+        if ($resp = $this->ensureCashier($request)) {
+            return $resp;
+        }
+
         $user = $request->user();
         $validated = $request->validate([
             'reason' => 'required|string|min:5',
         ]);
 
-        return DB::transaction(function () use ($user, $id, $validated) {
+        return DB::transaction(function () use ($user, $id, $validated, $request) {
             $transaction = Transaction::where('business_id', $user->business_id)
-                ->with('items')
+                ->with(['items', 'payment', 'outlet'])
                 ->findOrFail($id);
+
+            if ($user->role === 'cashier' && $user->business) {
+                $settings = $user->business->resolvedFeatureSettings($transaction->outlet);
+                if (empty($settings['pos_allow_void'])) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Pemilik bisnis menonaktifkan hak pembatalan transaksi (Void) untuk kasir pada outlet ini.',
+                    ], 403);
+                }
+            }
 
             if ($transaction->payment_status === 'voided') {
                 return response()->json([
@@ -387,7 +524,31 @@ class PosController extends Controller
                 }
             }
 
+            // Reconcile open shift drawer if transaction belongs to an active shift
+            if ($transaction->shift_id && $transaction->payment) {
+                $openShift = CashierShift::where('id', $transaction->shift_id)
+                    ->where('status', 'open')
+                    ->first();
+                if ($openShift) {
+                    if ($transaction->payment->payment_method === 'cash') {
+                        $openShift->decrement('cash_sales_total', $transaction->total_amount);
+                    } else {
+                        $openShift->decrement('non_cash_sales_total', $transaction->total_amount);
+                    }
+                }
+            }
+
             $transaction->update(['payment_status' => 'voided']);
+
+            ActivityLog::record(
+                $user->business_id,
+                $user->id,
+                'pos_void_transaction',
+                'Transaction',
+                $transaction->id,
+                ['invoice_number' => $transaction->invoice_number, 'reason' => $validated['reason']],
+                $request->ip()
+            );
 
             return response()->json([
                 'status' => 'success',

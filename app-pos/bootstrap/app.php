@@ -13,10 +13,43 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->append(\App\Http\Middleware\SecurityHeadersMiddleware::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
+
+        $exceptions->report(function (\Throwable $e) {
+            if (
+                $e instanceof \Illuminate\Validation\ValidationException ||
+                $e instanceof \Illuminate\Auth\AuthenticationException ||
+                ($e instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface && $e->getStatusCode() < 500)
+            ) {
+                return;
+            }
+
+            try {
+                if (\Illuminate\Support\Facades\Schema::hasTable('activity_logs')) {
+                    $req = request();
+                    $user = $req?->user();
+                    \App\Models\ActivityLog::record(
+                        $user?->business_id,
+                        $user?->id,
+                        'system_exception',
+                        'Exception',
+                        null,
+                        [
+                            'exception' => class_basename($e),
+                            'message' => mb_substr($e->getMessage(), 0, 260),
+                            'file' => basename($e->getFile()) . ':' . $e->getLine(),
+                            'method' => $req?->method(),
+                            'url' => $req?->path(),
+                        ],
+                        $req?->ip()
+                    );
+                }
+            } catch (\Throwable $ignored) {
+            }
+        });
     })->create();

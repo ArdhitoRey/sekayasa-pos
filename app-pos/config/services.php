@@ -35,4 +35,31 @@ return [
         ],
     ],
 
+    'antibot' => [
+        'driver' => env('ANTIBOT_DRIVER', 'tandha'),
+        'enabled' => filter_var(env('ANTIBOT_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+    ],
+
+    'turnstile' => [
+        'enabled' => filter_var(env('TURNSTILE_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+        'site_key' => env('TURNSTILE_SITE_KEY', ''),
+        'secret_key' => env('TURNSTILE_SECRET_KEY', ''),
+    ],
+
+    'google' => [
+        'client_id' => env('GOOGLE_CLIENT_ID', ''),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET', ''),
+        'redirect' => env('GOOGLE_REDIRECT_URI', '/auth/google/callback'),
+    ],
+
+    'whatsapp' => [
+        'sekayasa_number' => env('SEKAYASA_WHATSAPP_NUMBER', '6281234567890'),
+    ],
+
+    'midtrans' => [
+        'server_key' => env('MIDTRANS_SERVER_KEY', ''),
+        'client_key' => env('MIDTRANS_CLIENT_KEY', ''),
+        'is_production' => filter_var(env('MIDTRANS_IS_PRODUCTION', false), FILTER_VALIDATE_BOOLEAN),
+    ],
+
 ];

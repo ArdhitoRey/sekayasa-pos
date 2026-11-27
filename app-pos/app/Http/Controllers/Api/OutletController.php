@@ -14,13 +14,14 @@ class OutletController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $outlets = Outlet::where('business_id', $user->business_id)
-            ->where('is_active', true)
-            ->get();
+        $query = Outlet::where('business_id', $user->business_id)->orderBy('id');
+        if ($user->role !== 'owner' || $request->boolean('active_only')) {
+            $query->where('is_active', true);
+        }
 
         return response()->json([
             'status' => 'success',
-            'data' => $outlets,
+            'data' => $query->get(),
         ]);
     }
 
@@ -30,11 +31,17 @@ class OutletController extends Controller
     public function store(Request $request)
     {
         $user = $request->user();
+        if (!$user->canManageBusiness()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Hanya Pemilik Bisnis (Owner) yang dapat menambah outlet cabang.',
+            ], 403);
+        }
 
         // Enforce subscription plan limit (FR-060)
         $business = $user->business;
-        $sub = $business ? $business->currentSubscription : null;
-        $maxOutlets = ($sub && $sub->plan) ? $sub->plan->max_outlets : 1;
+        $limits = $business ? $business->planLimits() : ['max_outlets' => 1];
+        $maxOutlets = $limits['max_outlets'];
 
         $currentCount = Outlet::where('business_id', $user->business_id)->where('is_active', true)->count();
         if ($currentCount >= $maxOutlets) {
@@ -46,15 +53,27 @@ class OutletController extends Controller
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'outlet_code' => 'nullable|string|max:30',
+            'city' => 'nullable|string|max:100',
             'address' => 'nullable|string',
             'phone' => 'nullable|string|max:20',
+            'receipt_header' => 'nullable|string|max:255',
+            'receipt_footer' => 'nullable|string|max:255',
+            'tax_percentage' => 'nullable|numeric|min:0|max:100',
+            'feature_overrides' => 'nullable|array',
         ]);
 
         $outlet = Outlet::create([
             'business_id' => $user->business_id,
             'name' => $validated['name'],
+            'outlet_code' => !empty($validated['outlet_code']) ? strtoupper(trim($validated['outlet_code'])) : null,
+            'city' => $validated['city'] ?? null,
             'address' => $validated['address'] ?? null,
             'phone' => $validated['phone'] ?? null,
+            'receipt_header' => $validated['receipt_header'] ?? null,
+            'receipt_footer' => $validated['receipt_footer'] ?? null,
+            'tax_percentage' => $validated['tax_percentage'] ?? null,
+            'feature_overrides' => $validated['feature_overrides'] ?? null,
             'is_active' => true,
         ]);
 
@@ -66,26 +85,42 @@ class OutletController extends Controller
     }
 
     /**
-     * Update Outlet (FR-007)
+     * Update Outlet & Branch Overrides (FR-007)
      */
     public function update(Request $request, $id)
     {
         $user = $request->user();
+        if (!$user->canManageBusiness()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Hanya Pemilik Bisnis (Owner) yang dapat mengubah data outlet.',
+            ], 403);
+        }
         $outlet = Outlet::where('business_id', $user->business_id)->findOrFail($id);
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'outlet_code' => 'nullable|string|max:30',
+            'city' => 'nullable|string|max:100',
             'address' => 'nullable|string',
             'phone' => 'nullable|string|max:20',
+            'receipt_header' => 'nullable|string|max:255',
+            'receipt_footer' => 'nullable|string|max:255',
+            'tax_percentage' => 'nullable|numeric|min:0|max:100',
+            'feature_overrides' => 'nullable|array',
             'is_active' => 'boolean',
         ]);
+
+        if (array_key_exists('outlet_code', $validated) && !empty($validated['outlet_code'])) {
+            $validated['outlet_code'] = strtoupper(trim($validated['outlet_code']));
+        }
 
         $outlet->update($validated);
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Outlet berhasil diperbarui',
-            'data' => $outlet,
+            'message' => 'Pengaturan outlet berhasil diperbarui',
+            'data' => $outlet->fresh(),
         ]);
     }
 }

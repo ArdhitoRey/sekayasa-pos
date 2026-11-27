@@ -20,12 +20,28 @@ class Product extends Model
         'is_active',
     ];
 
+    protected $appends = [
+        'image_url',
+    ];
+
     protected $casts = [
         'buy_price' => 'decimal:2',
         'sell_price' => 'decimal:2',
         'min_stock_alert' => 'integer',
         'is_active' => 'boolean',
     ];
+
+    public function getImageUrlAttribute(): string
+    {
+        $path = trim((string) ($this->image_path ?? ''));
+        if ($path === '') {
+            return '/assets/products/default-product.svg';
+        }
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://') || str_starts_with($path, '/')) {
+            return $path;
+        }
+        return '/storage/' . ltrim($path, '/');
+    }
 
     public function business()
     {

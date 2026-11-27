@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Inventory;
+use App\Models\Outlet;
 use App\Models\Payment;
 use App\Models\Product;
 use App\Models\Transaction;
 use App\Models\TransactionItem;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,8 +22,24 @@ class ReportController extends Controller
     public function dashboard(Request $request)
     {
         $user = $request->user();
+        if (!$user->business_id) {
+            return response()->json(['status' => 'error', 'message' => 'Akses ringkasan hanya tersedia untuk akun bisnis.'], 403);
+        }
+        if ($user->role === 'admin' && $user->business) {
+            $settings = $user->business->resolvedFeatureSettings();
+            if (empty($settings['admin_view_dashboard'])) {
+                return response()->json(['status' => 'error', 'message' => 'Pemilik bisnis menonaktifkan akses ringkasan dashboard untuk Admin.'], 403);
+            }
+        }
         $businessId = $user->business_id;
-        $outletId = $request->query('outlet_id', $user->outlet_id);
+        $requestedOutletId = $request->query('outlet_id');
+        if ($requestedOutletId) {
+            Outlet::where('business_id', $businessId)->findOrFail($requestedOutletId);
+            if ($user->role === 'cashier' && $user->outlet_id && (int) $requestedOutletId !== (int) $user->outlet_id) {
+                return response()->json(['status' => 'error', 'message' => 'Kasir hanya dapat melihat ringkasan outlet tempat bertugas.'], 403);
+            }
+        }
+        $outletId = $user->role === 'cashier' ? ($user->outlet_id ?: $requestedOutletId) : $requestedOutletId;
 
         $today = Carbon::today();
 
@@ -104,8 +122,20 @@ class ReportController extends Controller
     public function salesReport(Request $request)
     {
         $user = $request->user();
+        if (!$user->canManageOperations()) {
+            return response()->json(['status' => 'error', 'message' => 'Akses laporan penjualan khusus Owner atau Admin.'], 403);
+        }
+        if ($user->role === 'admin' && $user->business) {
+            $settings = $user->business->resolvedFeatureSettings();
+            if (empty($settings['admin_view_sales_report'])) {
+                return response()->json(['status' => 'error', 'message' => 'Pemilik bisnis menonaktifkan akses laporan penjualan untuk Admin.'], 403);
+            }
+        }
         $businessId = $user->business_id;
-        $outletId = $request->query('outlet_id', $user->outlet_id);
+        $outletId = $request->query('outlet_id');
+        if ($outletId) {
+            Outlet::where('business_id', $businessId)->findOrFail($outletId);
+        }
         $startDate = $request->query('start_date', Carbon::today()->startOfMonth()->toDateString());
         $endDate = $request->query('end_date', Carbon::today()->toDateString());
 
@@ -119,6 +149,7 @@ class ReportController extends Controller
         }
 
         if ($cashierId = $request->query('cashier_id')) {
+            User::where('business_id', $businessId)->findOrFail($cashierId);
             $query->where('cashier_id', $cashierId);
         }
 
@@ -151,8 +182,14 @@ class ReportController extends Controller
     public function profitReport(Request $request)
     {
         $user = $request->user();
+        if (!$user->canManageBusiness()) {
+            return response()->json(['status' => 'error', 'message' => 'Laporan modal (HPP) dan laba kotor hanya dapat diakses oleh Pemilik Bisnis (Owner).'], 403);
+        }
         $businessId = $user->business_id;
         $outletId = $request->query('outlet_id', $user->outlet_id);
+        if ($outletId) {
+            Outlet::where('business_id', $businessId)->findOrFail($outletId);
+        }
         $startDate = $request->query('start_date', Carbon::today()->startOfMonth()->toDateString());
         $endDate = $request->query('end_date', Carbon::today()->toDateString());
 

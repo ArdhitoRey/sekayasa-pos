@@ -1,81 +1,78 @@
 @extends('layouts.site')
 
-@section('title', 'Tentang Kami — Seka Yasa POS Custom Studio')
+@section('title', 'Tentang Kami — Tandha by SEKA GROUP')
 
 @section('content')
 
-<!-- Dark Inner Header -->
-<section class="bg-[#1A1208] text-[#F7F3EC] py-20 border-b border-[rgba(247,176,95,0.16)]">
-    <div class="sy-container">
-        <div class="sy-index text-[#F7B05F] mb-3">01 / Filosofi & Standar Rekayasa</div>
-        <h1 class="sy-h1 max-w-3xl">Tata, Titi, Tentrem dalam Membangun Infrastruktur Bisnis</h1>
-        <p class="mt-4 text-[1.05rem] leading-[1.7] text-[#C4B5A2] max-w-[680px]">
-            Seka Yasa memadukan ketelitian analisis proses kerja Jawa dengan rekayasa perangkat lunak modern yang terisolasi dan dapat diaudit.
+<!-- PAGE HEADER -->
+<section class="inner-header">
+    <div class="container inner-header-grid reveal-on-scroll is-visible">
+        <div>
+            <span class="section-index section-index-light">Tentang Tandha · by SEKA GROUP</span>
+            <h1>Penanda transaksi kasir dan pembukuan stok cabang yang tertib bagi usaha Indonesia.</h1>
+        </div>
+        <p>
+            Tandha dikembangkan di Surabaya sebagai produk Point of Sale mandiri untuk membantu toko retail, F&amp;B, dan usaha multi-cabang merapikan operasional hariannya.
         </p>
     </div>
 </section>
 
-<!-- Principles Split (#FAF7F2) -->
-<section class="bg-[#FAF7F2] py-24">
-    <div class="sy-container">
-        <div class="sy-split">
-            <div class="sy-split-left">
-                <div class="sy-index text-[#775229] mb-3">02 / Prinsip Kerja Kami</div>
-                <h2 class="sy-h2 text-[#1A1208]">Tiga Landasan yang Menjaga Stabilitas Operasional Klien</h2>
-                <p class="mt-4 text-[0.98rem] leading-[1.65] text-[#524538]">
-                    Kami percaya perangkat lunak bisnis yang baik adalah sistem yang tidak menyulitkan kasir dan tidak membuat pemilik cemas akan kehilangan data.
-                </p>
+<!-- STORY -->
+<section class="inner-content" style="border-bottom: 1px solid var(--line-light);">
+    <div class="container">
+        <div class="about-story-grid reveal-on-scroll">
+            <div class="about-logo-frame">
+                <img src="/assets/Logo%20Tandha.svg" alt="Lambang Tandha POS" class="mark-lg">
+                <img src="/assets/tandha-text.svg" alt="Tandha by SEKA GROUP" class="text-lg">
             </div>
 
-            <div class="sy-split-right divide-y divide-[rgba(119,82,41,0.18)] border-t border-b border-[rgba(119,82,41,0.18)]">
-                <div class="py-8 grid grid-cols-[48px_1fr] gap-4">
-                    <span class="text-sm font-bold text-[#775229] pt-1">01</span>
-                    <div>
-                        <h3 class="sy-h3 text-[#1A1208]">Tata — Tertib Scope & Arsitektur Terisolasi</h3>
-                        <p class="mt-2 sy-body-point text-[#524538]">
-                            Setiap proyek diawali dokumen kebutuhan tertulis (SOW), menggunakan repository private serta database terpisah per klien agar data usaha tidak pernah bercampur.
-                        </p>
-                    </div>
-                </div>
+            <div class="about-prose">
+                <span class="section-index">Identitas Produk</span>
+                <h2 class="split-title">Makna di balik nama Tandha</h2>
+                <p>
+                    Dalam kosakata Jawa, <strong>Tandha</strong> bermakna tanda bukti, cap pengesahan, atau penanda yang sah. Setiap nota penjualan, mutasi barang antar-cabang, dan penutupan laci kasir semestinya meninggalkan jejak bukti yang bersih dan mudah diaudit.
+                </p>
+                <p>
+                    Dikembangkan sebagai produk POS tersendiri <strong>by SEKA GROUP</strong>, Tandha menggabungkan kemudahan paket kasir siap sewa bulanan dengan fleksibilitas layanan konsultasi penyesuaian alur usaha apabila toko Anda membutuhkan aturan operasional khusus.
+                </p>
+            </div>
+        </div>
 
-                <div class="py-8 grid grid-cols-[48px_1fr] gap-4">
-                    <span class="text-sm font-bold text-[#775229] pt-1">02</span>
-                    <div>
-                        <h3 class="sy-h3 text-[#1A1208]">Titi — Ketelitian Pengujian & Safety Gate</h3>
-                        <p class="mt-2 sy-body-point text-[#524538]">
-                            Tidak ada rilis produksi yang dijalankan sebelum verifikasi pembayaran 100%, persetujuan UAT klien, dan pengambilan snapshot backup database otomatis.
-                        </p>
-                    </div>
-                </div>
-
-                <div class="py-8 grid grid-cols-[48px_1fr] gap-4">
-                    <span class="text-sm font-bold text-[#775229] pt-1">03</span>
-                    <div>
-                        <h3 class="sy-h3 text-[#1A1208]">Tentrem — Infrastruktur Produksi yang Andal</h3>
-                        <p class="mt-2 sy-body-point text-[#524538]">
-                            Hosting gratis hanya kami gunakan untuk preview atau staging dummy; operasional toko nyata wajib berjalan di VPS/hosting berbayar dengan backup eksternal dan SLA jelas.
-                        </p>
-                    </div>
-                </div>
+        <div class="capability-grid-3">
+            <div class="capability-card reveal-on-scroll">
+                <span class="capability-icon"><i data-lucide="database" class="w-5 h-5"></i></span>
+                <h3>Isolasi Akun Per Bisnis</h3>
+                <p>Setiap pemilik bisnis beroperasi dalam ruang data sendiri dengan validasi NIK unik, email, WhatsApp, serta proteksi anti-bot Cloudflare.</p>
+            </div>
+            <div class="capability-card reveal-on-scroll delay-1">
+                <span class="capability-icon"><i data-lucide="receipt" class="w-5 h-5"></i></span>
+                <h3>Transparan di Kasir &amp; Laba</h3>
+                <p>Stok terkunci otomatis saat checkout, tutup shift mencatat uang fisik laci, dan pemilik langsung melihat HPP serta margin kotor per cabang.</p>
+            </div>
+            <div class="capability-card reveal-on-scroll delay-2">
+                <span class="capability-icon"><i data-lucide="sliders" class="w-5 h-5"></i></span>
+                <h3>Siap Pakai Maupun Custom</h3>
+                <p>Mulai cepat dengan paket bulanan Starter, Business, dan Enterprise, atau ajukan penyesuaian alur POS bersama analis Surabaya kami.</p>
             </div>
         </div>
     </div>
 </section>
 
-<!-- Hosting & Ownership Policy (#F3EDE4) -->
-<section class="bg-[#F3EDE4] py-20 border-t border-[rgba(119,82,41,0.18)]">
-    <div class="sy-container">
-        <div class="max-w-3xl">
-            <div class="sy-index text-[#775229] mb-3">03 / Transparansi Hosting & Kepemilikan Data</div>
-            <h2 class="sy-h2 text-[#1A1208]">Data Penjualan Anda Sepenuhnya Milik Perusahaan Anda</h2>
-            <p class="mt-4 sy-body-point text-[#524538]">
-                Penyedia hanya mengelola server, keamanan TLS/SSL, serta pemeliharaan sistem sesuai kontrak bulanan; seluruh data transaksi dapat diekspor utuh kapan saja sesuai ketentuan kontrak.
+<!-- CLOSING CTA -->
+<section class="full-stage stage-closing">
+    <div class="container closing-banner reveal-on-scroll">
+        <div class="max-w-2xl">
+            <span class="section-index section-index-light">Langkah Berikutnya</span>
+            <h2 class="text-3xl font-bold text-white leading-tight mb-3">
+                Siap merapikan kasir dan kontrol stok cabang bersama Tandha?
+            </h2>
+            <p class="text-sm sm:text-base text-[#B8D0C9]">
+                Pilih paket langganan bulanan atau jadwalkan konsultasi kebutuhan toko Anda melalui portal akun Tandha.
             </p>
-            <div class="mt-8">
-                <a href="/contact" class="px-6 py-3 rounded-md bg-[#775229] hover:bg-[#583B1B] text-[#FAF7F2] text-sm font-bold transition inline-block">
-                    Diskusikan Arsitektur Usaha Anda
-                </a>
-            </div>
+        </div>
+        <div class="flex flex-wrap gap-3">
+            <a href="/harga" class="btn btn-mint btn-lg">Lihat Harga Paket →</a>
+            <a href="/contact" class="btn btn-ghost-light btn-lg">Jadwalkan Konsultasi →</a>
         </div>
     </div>
 </section>

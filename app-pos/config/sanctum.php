@@ -44,13 +44,18 @@ return [
     | Expiration Minutes
     |--------------------------------------------------------------------------
     |
-    | This value controls the number of minutes until an issued token will be
-    | considered expired. This will override any values set in the token's
-    | "expires_at" attribute, but first-party sessions are not affected.
+    | Global expiration is disabled by default so Cashier (POS) tokens stay
+    | persistent until explicitly revoked or logged out. Non-cashier accounts
+    | (Owner, Admin, SuperAdmin) receive explicit expiration via
+    | non_cashier_expiration_minutes.
     |
     */
 
-    'expiration' => null,
+    'expiration' => env('SANCTUM_GLOBAL_EXPIRATION_MINUTES') !== null
+        ? (int) env('SANCTUM_GLOBAL_EXPIRATION_MINUTES')
+        : null,
+
+    'non_cashier_expiration_minutes' => (int) env('SANCTUM_TOKEN_EXPIRATION_MINUTES', 10080),
 
     /*
     |--------------------------------------------------------------------------

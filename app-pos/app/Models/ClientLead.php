@@ -14,15 +14,23 @@ class ClientLead extends Model
         'email',
         'phone',
         'business_type',
+        'scale',
+        'subscription_plan_snapshot',
         'source',
         'status',
         'notes',
         'template_gap_notes',
         'preferred_consultation_at',
+        'consultation_time_slot',
+        'whatsapp_status',
+        'whatsapp_sent_at',
+        'whatsapp_sent_by',
+        'reminder_notes',
     ];
 
     protected $casts = [
         'preferred_consultation_at' => 'datetime',
+        'whatsapp_sent_at' => 'datetime',
     ];
 
     public function user()
