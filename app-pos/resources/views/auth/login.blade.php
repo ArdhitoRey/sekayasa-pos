@@ -110,6 +110,7 @@
 
         <!-- Collapsible Testing Role Drawer & Footer -->
         <div class="relative z-10 space-y-4">
+            @if(app()->environment(['local', 'testing']) || config('app.debug'))
             <div class="border-t border-[#143B32] pt-4">
                 <button type="button" @click="showDemoDrawer = !showDemoDrawer" class="text-[11px] font-semibold text-slate-300 hover:text-[#34D399] flex items-center gap-1.5 transition">
                     <i data-lucide="key-round" class="w-3.5 h-3.5 text-[#34D399]"></i>
@@ -144,6 +145,7 @@
                     </button>
                 </div>
             </div>
+            @endif
 
             <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#647C76]">
                 <span>© 2026 Tandha — Developed by SEKA GROUP</span>
@@ -186,7 +188,7 @@
                     <div class="text-xs text-slate-300 mt-0.5" x-text="currentUser.email + (currentUser.business ? ' • ' + currentUser.business.name : '')"></div>
                 </div>
                 <div class="flex flex-wrap gap-2.5 pt-1">
-                    <a :href="resolveRedirectForUser(currentUser, redirectTarget)" class="flex-1 py-2.5 px-4 bg-[#34D399] hover:bg-[#D97706] text-slate-950 rounded-lg text-xs font-bold text-center transition">
+                    <a :href="resolveRedirectForUser(currentUser, sanitizeRedirectUrl(redirectTarget))" class="flex-1 py-2.5 px-4 bg-[#34D399] hover:bg-[#D97706] text-slate-950 rounded-lg text-xs font-bold text-center transition">
                         Lanjutkan ke Akun Saya →
                     </a>
                     <button type="button" @click="logoutCurrent()" class="py-2.5 px-4 bg-[#143B32] border border-white/15 text-slate-300 hover:text-rose-400 rounded-lg text-xs font-semibold transition">
@@ -287,7 +289,7 @@
                         <div class="flex-grow border-t border-[#E5E0D5]"></div>
                     </div>
 
-                    <a href="/auth/google"
+                    <a :href="redirectTarget ? ('/auth/google?redirect=' + encodeURIComponent(redirectTarget)) : '/auth/google'"
                         class="w-full py-3 px-4 bg-white hover:bg-[#F7FAF9] border border-[#D1C9B8] text-[#0D2620] font-semibold rounded-xl text-xs shadow-xs transition flex items-center justify-center gap-2.5">
                         <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
                             <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.4 1 3.5 3.6 1.6 7.4l3.7 2.8C6.2 7.2 8.9 5 12 5z"/>
@@ -430,7 +432,7 @@
                     Satu pengguna hanya diperbolehkan mendaftar satu kali. Anda sedang login sebagai <b class="text-[#0D2620]" x-text="currentUser.name"></b> (<span x-text="currentUser.email"></span>).
                 </p>
                 <div>
-                    <a :href="redirectTarget || '/dashboard'" class="inline-block px-4 py-2 bg-[#0D2620] hover:bg-[#143B32] text-white font-bold rounded-lg transition">
+                    <a :href="sanitizeRedirectUrl(redirectTarget) || '/dashboard'" class="inline-block px-4 py-2 bg-[#0D2620] hover:bg-[#143B32] text-white font-bold rounded-lg transition">
                         Buka Dashboard Saya →
                     </a>
                 </div>
@@ -451,7 +453,7 @@
 
                 <div x-show="!googlePendingToken" class="flex flex-wrap items-center justify-between gap-2 p-3 bg-white border border-[#E5E0D5] rounded-xl text-xs">
                     <span class="text-[#3D544E]">Ingin daftar dengan email Google Anda?</span>
-                    <a href="/auth/google" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[#D1C9B8] hover:border-[#0D7A5F] font-semibold text-[#0D2620] transition">
+                    <a :href="redirectTarget ? ('/auth/google?redirect=' + encodeURIComponent(redirectTarget)) : '/auth/google'" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[#D1C9B8] hover:border-[#0D7A5F] font-semibold text-[#0D2620] transition">
                         <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" aria-hidden="true">
                             <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.4 1 3.5 3.6 1.6 7.4l3.7 2.8C6.2 7.2 8.9 5 12 5z"/>
                             <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.6l3.7 2.9c2.2-2 3.7-5 3.7-8.7z"/>
@@ -464,15 +466,15 @@
 
                 <!-- Stepper -->
                 <div class="grid grid-cols-3 gap-2 pb-4 border-b border-[#E5E0D5]">
-                    <button type="button" @click="regStep = 1" class="text-left">
+                    <button type="button" @click="goToRegStep(1)" class="text-left">
                         <div class="h-1.5 rounded-full mb-1.5 transition" :class="regStep >= 1 ? 'bg-[#0D7A5F]' : 'bg-slate-200'"></div>
                         <span class="block text-[10px] font-bold uppercase tracking-wider" :class="regStep === 1 ? 'text-[#0D7A5F]' : 'text-slate-300'">Identitas PIC</span>
                     </button>
-                    <button type="button" @click="if(regStep > 1 || validateStep1(false)) regStep = 2" class="text-left">
+                    <button type="button" @click="goToRegStep(2)" class="text-left">
                         <div class="h-1.5 rounded-full mb-1.5 transition" :class="regStep >= 2 ? 'bg-[#0D7A5F]' : 'bg-slate-200'"></div>
                         <span class="block text-[10px] font-bold uppercase tracking-wider" :class="regStep === 2 ? 'text-[#0D7A5F]' : 'text-slate-300'">02 • Profil Usaha</span>
                     </button>
-                    <button type="button" @click="if(regStep === 3 || (validateStep1(false) && validateStep2(false))) regStep = 3" class="text-left">
+                    <button type="button" @click="goToRegStep(3)" class="text-left">
                         <div class="h-1.5 rounded-full mb-1.5 transition" :class="regStep >= 3 ? 'bg-[#0D7A5F]' : 'bg-slate-200'"></div>
                         <span class="block text-[10px] font-bold uppercase tracking-wider" :class="regStep === 3 ? 'text-[#0D7A5F]' : 'text-slate-300'">03 • Outlet &amp; Akun</span>
                     </button>
@@ -490,14 +492,14 @@
                             <label for="reg-owner" class="block text-[13px] font-semibold text-[#0D2620] mb-1.5">Nama Lengkap Sesuai KTP <span class="text-[#0D7A5F]">*</span></label>
                             <div class="relative flex items-center bg-white border border-[#D1C9B8] rounded-xl focus-within:border-[#0D7A5F] focus-within:ring-4 focus-within:ring-[#0D7A5F]/10">
                                 <span class="pl-3.5 pr-2.5 text-slate-300 flex items-center"><i data-lucide="user" class="w-4 h-4"></i></span>
-                                <input id="reg-owner" type="text" x-model="regData.owner_name" required placeholder="Budi Hartono" class="w-full py-2.5 pr-3.5 bg-transparent text-sm text-[#0D2620] placeholder-slate-400 focus:outline-none">
+                                <input id="reg-owner" type="text" x-model="regData.owner_name" :required="tab === 'register' && regStep === 1" placeholder="Budi Hartono" class="w-full py-2.5 pr-3.5 bg-transparent text-sm text-[#0D2620] placeholder-slate-400 focus:outline-none">
                             </div>
                         </div>
                         <div>
                             <label for="reg-nik" class="block text-[13px] font-semibold text-[#0D2620] mb-1.5">NIK KTP (16 Digit) <span class="text-[#0D7A5F]">*</span></label>
                             <div class="relative flex items-center bg-white border border-[#D1C9B8] rounded-xl focus-within:border-[#0D7A5F] focus-within:ring-4 focus-within:ring-[#0D7A5F]/10">
                                 <span class="pl-3.5 pr-2.5 text-slate-300 flex items-center"><i data-lucide="id-card" class="w-4 h-4"></i></span>
-                                <input id="reg-nik" type="text" inputmode="numeric" maxlength="16" x-model="regData.nik" required placeholder="3578xxxxxxxxxxxx" class="w-full py-2.5 pr-3.5 bg-transparent text-sm tabular-nums text-[#0D2620] placeholder-slate-400 focus:outline-none">
+                                <input id="reg-nik" type="text" inputmode="numeric" maxlength="16" x-model="regData.nik" :required="tab === 'register' && regStep === 1" placeholder="3578xxxxxxxxxxxx" class="w-full py-2.5 pr-3.5 bg-transparent text-sm tabular-nums text-[#0D2620] placeholder-slate-400 focus:outline-none">
                             </div>
                         </div>
                     </div>
@@ -525,7 +527,7 @@
                             <label for="reg-phone" class="block text-[13px] font-semibold text-[#0D2620] mb-1.5">No. WhatsApp Aktif <span class="text-[#0D7A5F]">*</span></label>
                             <div class="relative flex items-center bg-white border border-[#D1C9B8] rounded-xl focus-within:border-[#0D7A5F] focus-within:ring-4 focus-within:ring-[#0D7A5F]/10">
                                 <span class="pl-3.5 pr-2.5 text-slate-300 flex items-center"><i data-lucide="phone" class="w-4 h-4"></i></span>
-                                <input id="reg-phone" type="tel" x-model="regData.phone" required placeholder="0812xxxxxxxx" class="w-full py-2.5 pr-3.5 bg-transparent text-sm text-[#0D2620] placeholder-slate-400 focus:outline-none">
+                                <input id="reg-phone" type="tel" x-model="regData.phone" :required="tab === 'register' && regStep === 1" placeholder="0812xxxxxxxx" class="w-full py-2.5 pr-3.5 bg-transparent text-sm text-[#0D2620] placeholder-slate-400 focus:outline-none">
                             </div>
                         </div>
                     </div>
@@ -540,7 +542,7 @@
                                 <div class="flex-1 relative flex items-center border border-[#D1C9B8] rounded-xl focus-within:border-[#0D7A5F] focus-within:ring-4 focus-within:ring-[#0D7A5F]/10"
                                     :class="googlePendingToken ? 'bg-slate-100' : 'bg-white'">
                                     <span class="pl-3.5 pr-2.5 text-slate-300 flex items-center"><i data-lucide="mail" class="w-4 h-4"></i></span>
-                                    <input id="reg-email" type="email" x-model="regData.email" :readonly="Boolean(googlePendingToken)" required autocomplete="email" placeholder="owner@perusahaan.co.id" class="w-full py-2.5 pr-3.5 bg-transparent text-sm text-[#0D2620] placeholder-slate-400 focus:outline-none">
+                                    <input id="reg-email" type="email" x-model="regData.email" :readonly="Boolean(googlePendingToken)" :required="tab === 'register' && regStep === 1" autocomplete="email" placeholder="owner@perusahaan.co.id" class="w-full py-2.5 pr-3.5 bg-transparent text-sm text-[#0D2620] placeholder-slate-400 focus:outline-none">
                                 </div>
                                 <button x-show="!googlePendingToken" type="button" @click="sendVerificationCode()" :disabled="sendingOtp || otpCooldown > 0"
                                     class="px-3.5 py-2.5 bg-[#E6F4EF] hover:bg-[#0D7A5F] text-[#0D7A5F] hover:text-white border border-[#0D7A5F]/30 rounded-xl text-xs font-bold whitespace-nowrap transition disabled:opacity-50">
@@ -555,7 +557,7 @@
                             <label for="reg-otp" class="block text-[13px] font-semibold text-[#0D2620] mb-1.5">Kode Verifikasi Email (6 Digit) <span class="text-[#0D7A5F]">*</span></label>
                             <div class="relative flex items-center bg-white border border-[#D1C9B8] rounded-xl focus-within:border-[#0D7A5F] focus-within:ring-4 focus-within:ring-[#0D7A5F]/10">
                                 <span class="pl-3.5 pr-2.5 text-slate-300 flex items-center"><i data-lucide="key-round" class="w-4 h-4"></i></span>
-                                <input id="reg-otp" type="text" inputmode="numeric" maxlength="6" x-model="regData.verification_code" :required="!googlePendingToken" placeholder="Masukkan 6 digit kode dari email"
+                                <input id="reg-otp" type="text" inputmode="numeric" maxlength="6" x-model="regData.verification_code" :required="tab === 'register' && regStep === 1 && !googlePendingToken" placeholder="Masukkan 6 digit kode dari email"
                                     class="w-full py-2.5 pr-3.5 bg-transparent text-sm tabular-nums tracking-widest text-[#0D2620] placeholder-slate-400 placeholder:tracking-normal focus:outline-none">
                             </div>
                             <p class="text-[11px] text-[#647C76] mt-1">Email terverifikasi memastikan akun aktif &amp; dapat digunakan untuk fitur lupa kata sandi.</p>
@@ -596,7 +598,7 @@
                         </div>
                         <div class="sm:col-span-2">
                             <label for="reg-business" class="block text-[13px] font-semibold text-[#0D2620] mb-1.5">Nama Perusahaan / Merek <span class="text-[#0D7A5F]">*</span></label>
-                            <input id="reg-business" type="text" x-model="regData.business_name" required placeholder="Kopi Nusantara Sejahtera" class="w-full py-2.5 px-3.5 bg-white border border-[#D1C9B8] rounded-xl text-sm text-[#0D2620] placeholder-slate-400 focus:outline-none focus:border-[#0D7A5F]">
+                            <input id="reg-business" type="text" x-model="regData.business_name" :required="tab === 'register' && regStep === 2" placeholder="Kopi Nusantara Sejahtera" class="w-full py-2.5 px-3.5 bg-white border border-[#D1C9B8] rounded-xl text-sm text-[#0D2620] placeholder-slate-400 focus:outline-none focus:border-[#0D7A5F]">
                         </div>
                     </div>
 
@@ -657,11 +659,11 @@
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
                             <label for="reg-province" class="block text-[13px] font-semibold text-[#0D2620] mb-1.5">Provinsi <span class="text-[#0D7A5F]">*</span></label>
-                            <input id="reg-province" type="text" x-model="regData.province" required placeholder="Jawa Timur" class="w-full py-2.5 px-3 bg-white border border-[#D1C9B8] rounded-xl text-sm text-[#0D2620] placeholder-slate-400 focus:outline-none focus:border-[#0D7A5F]">
+                            <input id="reg-province" type="text" x-model="regData.province" :required="tab === 'register' && regStep === 2" placeholder="Jawa Timur" class="w-full py-2.5 px-3 bg-white border border-[#D1C9B8] rounded-xl text-sm text-[#0D2620] placeholder-slate-400 focus:outline-none focus:border-[#0D7A5F]">
                         </div>
                         <div>
                             <label for="reg-city" class="block text-[13px] font-semibold text-[#0D2620] mb-1.5">Kota / Kab. <span class="text-[#0D7A5F]">*</span></label>
-                            <input id="reg-city" type="text" x-model="regData.city" required placeholder="Kota Surabaya" class="w-full py-2.5 px-3 bg-white border border-[#D1C9B8] rounded-xl text-sm text-[#0D2620] placeholder-slate-400 focus:outline-none focus:border-[#0D7A5F]">
+                            <input id="reg-city" type="text" x-model="regData.city" :required="tab === 'register' && regStep === 2" placeholder="Kota Surabaya" class="w-full py-2.5 px-3 bg-white border border-[#D1C9B8] rounded-xl text-sm text-[#0D2620] placeholder-slate-400 focus:outline-none focus:border-[#0D7A5F]">
                         </div>
                         <div>
                             <label for="reg-postal" class="block text-[13px] font-semibold text-[#0D2620] mb-1.5">Kode Pos</label>
@@ -671,7 +673,7 @@
 
                     <div>
                         <label for="reg-address" class="block text-[13px] font-semibold text-[#0D2620] mb-1.5">Alamat Lengkap Usaha <span class="text-[#0D7A5F]">*</span></label>
-                        <input id="reg-address" type="text" x-model="regData.address" required placeholder="Jl. Raya Darmo No. 12, Wonokromo" class="w-full py-2.5 px-3.5 bg-white border border-[#D1C9B8] rounded-xl text-sm text-[#0D2620] placeholder-slate-400 focus:outline-none focus:border-[#0D7A5F]">
+                        <input id="reg-address" type="text" x-model="regData.address" :required="tab === 'register' && regStep === 2" placeholder="Jl. Raya Darmo No. 12, Wonokromo" class="w-full py-2.5 px-3.5 bg-white border border-[#D1C9B8] rounded-xl text-sm text-[#0D2620] placeholder-slate-400 focus:outline-none focus:border-[#0D7A5F]">
                     </div>
 
                     <div class="grid grid-cols-[auto_1fr] gap-3 pt-1">
@@ -693,7 +695,7 @@
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div class="sm:col-span-2">
                             <label for="reg-outlet" class="block text-[13px] font-semibold text-[#0D2620] mb-1.5">Nama Outlet Pertama <span class="text-[#0D7A5F]">*</span></label>
-                            <input id="reg-outlet" type="text" x-model="regData.outlet_name" required placeholder="Outlet Pusat Surabaya" class="w-full py-2.5 px-3.5 bg-white border border-[#D1C9B8] rounded-xl text-sm text-[#0D2620] placeholder-slate-400 focus:outline-none focus:border-[#0D7A5F]">
+                            <input id="reg-outlet" type="text" x-model="regData.outlet_name" :required="tab === 'register' && regStep === 3" placeholder="Outlet Pusat Surabaya" class="w-full py-2.5 px-3.5 bg-white border border-[#D1C9B8] rounded-xl text-sm text-[#0D2620] placeholder-slate-400 focus:outline-none focus:border-[#0D7A5F]">
                         </div>
                         <div>
                             <label for="reg-outlet-code" class="block text-[13px] font-semibold text-[#0D2620] mb-1.5">Kode Outlet</label>
@@ -747,7 +749,7 @@
                                 <span x-show="!googlePendingToken" class="text-[#0D7A5F]">*</span>
                             </label>
                             <div class="relative flex items-center bg-white border border-[#D1C9B8] rounded-xl focus-within:border-[#0D7A5F] focus-within:ring-4 focus-within:ring-[#0D7A5F]/10">
-                                <input id="reg-password" :type="showRegPassword ? 'text' : 'password'" x-model="regData.password" :required="!googlePendingToken" minlength="6" :placeholder="googlePendingToken ? 'Boleh kosong jika pakai Google' : 'Min. 6 karakter'" class="w-full py-2.5 pl-3.5 pr-9 bg-transparent text-sm text-[#0D2620] focus:outline-none">
+                                <input id="reg-password" :type="showRegPassword ? 'text' : 'password'" x-model="regData.password" :required="tab === 'register' && regStep === 3 && !googlePendingToken" minlength="6" :placeholder="googlePendingToken ? 'Boleh kosong jika pakai Google' : 'Min. 6 karakter'" class="w-full py-2.5 pl-3.5 pr-9 bg-transparent text-sm text-[#0D2620] focus:outline-none">
                                 <button type="button" @click="showRegPassword = !showRegPassword" class="pr-3 text-slate-300 hover:text-[#3D544E]">
                                     <i x-show="!showRegPassword" data-lucide="eye" class="w-4 h-4"></i>
                                     <i x-show="showRegPassword" data-lucide="eye-off" class="w-4 h-4" x-cloak></i>
@@ -759,12 +761,12 @@
                                 <span>Konfirmasi Sandi</span>
                                 <span x-show="!googlePendingToken || regData.password" class="text-[#0D7A5F]">*</span>
                             </label>
-                            <input id="reg-password-confirm" :type="showRegPassword ? 'text' : 'password'" x-model="regData.password_confirmation" :required="!googlePendingToken || Boolean(regData.password)" minlength="6" placeholder="Ulangi kata sandi" class="w-full py-2.5 px-3.5 bg-white border border-[#D1C9B8] rounded-xl text-sm text-[#0D2620] focus:outline-none focus:border-[#0D7A5F]">
+                            <input id="reg-password-confirm" :type="showRegPassword ? 'text' : 'password'" x-model="regData.password_confirmation" :required="tab === 'register' && regStep === 3 && (!googlePendingToken || Boolean(regData.password))" minlength="6" placeholder="Ulangi kata sandi" class="w-full py-2.5 px-3.5 bg-white border border-[#D1C9B8] rounded-xl text-sm text-[#0D2620] focus:outline-none focus:border-[#0D7A5F]">
                         </div>
                     </div>
 
                     <label class="p-3.5 bg-[#F7FAF9] border border-[#E5E0D5] rounded-xl flex items-start gap-2.5 text-xs text-[#3D544E] cursor-pointer">
-                        <input type="checkbox" x-model="regData.agree_terms" required class="mt-0.5 accent-[#0D7A5F]">
+                        <input type="checkbox" x-model="regData.agree_terms" :required="tab === 'register' && regStep === 3" class="mt-0.5 accent-[#0D7A5F]">
                         <span>Saya menyatakan data perusahaan &amp; PIC di atas benar, dan memahami bahwa <b>1 NIK, 1 email, dan 1 nomor WhatsApp</b> hanya berlaku untuk 1 akun bisnis.</span>
                     </label>
 
@@ -832,13 +834,21 @@ function authPage() {
         error: '',
     });
 
+    const sanitizeRedirect = (raw) => {
+        const s = String(raw || '').trim();
+        if (!s || !s.startsWith('/') || s.startsWith('//') || s.includes('\\') || /[\x00-\x1f]/.test(s)) {
+            return '';
+        }
+        return s;
+    };
+
     return {
         isKasirAppMode: isKasirApp,
         apkBlockedNotice: '',
         tab: isKasirApp ? 'login' : (params.get('tab') === 'register' ? 'register' : 'login'),
-        redirectTarget: params.get('redirect') || '',
+        redirectTarget: sanitizeRedirect(params.get('redirect')),
         existingToken: localStorage.getItem('pos_token') || '',
-        currentUser: JSON.parse(localStorage.getItem('pos_user') || '{}'),
+        currentUser: (() => { try { return JSON.parse(localStorage.getItem('pos_user') || '{}') || {}; } catch (_) { localStorage.removeItem('pos_user'); return {}; } })(),
         showLoginPassword: false,
         showRegPassword: false,
         showDemoDrawer: false,
@@ -1074,7 +1084,17 @@ function authPage() {
         get alreadyLoggedIn() {
             return Boolean(this.existingToken && this.currentUser && this.currentUser.id);
         },
-        logoutCurrent() {
+        async logoutCurrent(revokeServer = true) {
+            const currentToken = this.existingToken;
+            if (revokeServer && currentToken) {
+                try {
+                    await fetch('/api/logout', {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${currentToken}`, 'Accept': 'application/json' },
+                        keepalive: true,
+                    });
+                } catch (_) {}
+            }
             localStorage.removeItem('pos_token');
             localStorage.removeItem('pos_user');
             this.existingToken = '';
@@ -1169,16 +1189,45 @@ function authPage() {
                     window.history.replaceState({}, document.title, '/login?app=kasir');
                 }
             }
+            this.verifyExistingSession();
             this.initTurnstile();
             this.handleUrlQueryParams();
         },
+        async verifyExistingSession() {
+            if (!this.existingToken) return;
+            try {
+                const res = await fetch('/api/me', { headers: { 'Authorization': `Bearer ${this.existingToken}`, 'Accept': 'application/json' } });
+                if (!res.ok) {
+                    await this.logoutCurrent(false);
+                    return;
+                }
+                const data = await res.json().catch(() => ({}));
+                if (data.status === 'success' && data.data) {
+                    this.currentUser = data.data;
+                    localStorage.setItem('pos_user', JSON.stringify(data.data));
+                    if (this.isKasirAppMode && this.currentUser.role !== 'cashier') {
+                        await this.logoutCurrent(false);
+                    }
+                } else {
+                    await this.logoutCurrent(false);
+                }
+            } catch (_) {}
+        },
+        sanitizeRedirectUrl(raw) {
+            const s = String(raw || '').trim();
+            if (!s || !s.startsWith('/') || s.startsWith('//') || s.includes('\\') || /[\x00-\x1f]/.test(s)) {
+                return '';
+            }
+            return s;
+        },
         resolveRedirectForUser(userObj, explicitRedirect = null) {
-            if (!userObj) return explicitRedirect || (this.isKasirAppMode ? '/pos?app=kasir' : '/dashboard?tab=billing');
+            const safeRedirect = this.sanitizeRedirectUrl(explicitRedirect);
+            if (!userObj) return safeRedirect || (this.isKasirAppMode ? '/pos?app=kasir' : '/dashboard?tab=billing');
             if (this.isKasirAppMode && userObj.role === 'cashier') return '/pos?app=kasir';
             if (userObj.role === 'superadmin') return '/dashboard';
             if (userObj.role === 'cashier') return '/pos';
             if (userObj.role === 'admin') return '/dashboard';
-            if (explicitRedirect) return explicitRedirect;
+            if (safeRedirect) return safeRedirect;
             const biz = userObj.business;
             if (biz && (biz.has_active_subscription || biz.can_install_apk)) {
                 return '/dashboard';
@@ -1191,6 +1240,8 @@ function authPage() {
         async handleUrlQueryParams() {
             if (this.isKasirAppMode) return;
             const p = new URLSearchParams(window.location.search);
+            const urlRedirect = this.sanitizeRedirectUrl(p.get('redirect'));
+            if (urlRedirect) this.redirectTarget = urlRedirect;
             const err = p.get('google_error');
             if (err) {
                 const msgMap = {
@@ -1199,6 +1250,7 @@ function authPage() {
                     invalid_state: 'Sesi otentikasi Google tidak valid atau kedaluwarsa. Silakan coba lagi.',
                     token_exchange_failed: 'Gagal memverifikasi otorisasi Google.',
                     profile_failed: 'Gagal mengambil alamat email dari akun Google.',
+                    unverified_email: 'Email pada akun Google Anda belum terverifikasi oleh Google.',
                     account_suspended: 'Akun atau bisnis Anda sedang dibekukan. Hubungi admin Tandha.',
                 };
                 Swal.fire({ icon: 'error', title: 'Google Login Gagal', text: msgMap[err] || 'Gagal menghubungkan akun Google.', confirmButtonColor: '#0D7A5F' });
@@ -1212,7 +1264,7 @@ function authPage() {
                 const res = await fetch(`/api/auth/google/exchange/${encodeURIComponent(nonce)}`, {
                     headers: { 'Accept': 'application/json' },
                 });
-                const result = await res.json();
+                const result = await res.json().catch(() => ({}));
                 window.history.replaceState({}, document.title, window.location.pathname);
                 if (!res.ok || !result.data) {
                     Swal.fire({ icon: 'error', title: 'Sesi Google Kedaluwarsa', text: result.message || 'Silakan ulangi login dengan Google.', confirmButtonColor: '#0D7A5F' });
@@ -1282,7 +1334,8 @@ function authPage() {
         },
         async sendVerificationCode() {
             const email = (this.regData.email || '').trim();
-            if (!email || !email.includes('@')) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!email || !emailRegex.test(email)) {
                 Swal.fire({ icon: 'warning', title: 'Email Tidak Valid', text: 'Masukkan alamat email bisnis aktif terlebih dahulu.', confirmButtonColor: '#0D7A5F' });
                 return;
             }
@@ -1379,9 +1432,11 @@ function authPage() {
         validateStep1(showAlert = true) {
             const nikClean = (this.regData.nik || '').replace(/\D+/g, '');
             const otpClean = (this.regData.verification_code || '').replace(/\D+/g, '');
-            if (!this.regData.owner_name.trim() || nikClean.length !== 16 || !this.regData.phone.trim() || !this.regData.email.trim()) {
+            const emailTrim = (this.regData.email || '').trim();
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!this.regData.owner_name.trim() || nikClean.length !== 16 || !this.regData.phone.trim() || !emailRegex.test(emailTrim)) {
                 if (showAlert) {
-                    Swal.fire({ icon: 'warning', title: 'Lengkapi Identitas PIC', text: 'Pastikan Nama Lengkap, NIK (16 digit angka), No. WhatsApp, dan Email Bisnis sudah terisi benar.', confirmButtonColor: '#0D7A5F' });
+                    Swal.fire({ icon: 'warning', title: 'Lengkapi Identitas PIC', text: 'Pastikan Nama Lengkap, NIK (16 digit angka), No. WhatsApp, dan format Email Bisnis sudah benar.', confirmButtonColor: '#0D7A5F' });
                 }
                 return false;
             }
@@ -1391,6 +1446,7 @@ function authPage() {
                 }
                 return false;
             }
+            this.regData.email = emailTrim;
             this.regData.nik = nikClean;
             this.regData.verification_code = otpClean;
             return true;
@@ -1426,6 +1482,7 @@ function authPage() {
                 Swal.fire({ icon: 'warning', title: 'Verifikasi Keamanan', text: msg, confirmButtonColor: '#0D7A5F' });
                 return;
             }
+            if (this.loading) return;
             this.loading = true;
             try {
                 const res = await fetch('/api/login', {
@@ -1438,16 +1495,19 @@ function authPage() {
                         company_website: this.honeypotField,
                     }),
                 });
-                const result = await res.json();
+                const raw = await res.text();
+                let result = {};
+                try { result = raw ? JSON.parse(raw) : {}; } catch (_) {}
                 if (res.ok) {
                     if (this.isKasirAppMode && result.data && result.data.user && result.data.user.role !== 'cashier') {
-                        this.logoutCurrent();
+                        await this.logoutCurrent(false);
                         Swal.fire({ icon: 'error', title: 'Khusus Akun Kasir', text: 'Aplikasi Kasir (APK) hanya untuk akun Kasir (Cashier).', confirmButtonColor: '#0D7A5F' });
                         return;
                     }
                     localStorage.setItem('pos_token', result.data.token);
                     localStorage.setItem('pos_user', JSON.stringify(result.data.user));
-                    const target = redirectUrl || this.resolveRedirectForUser(result.data.user, this.redirectTarget);
+                    const safeDirect = this.sanitizeRedirectUrl(redirectUrl);
+                    const target = safeDirect || this.resolveRedirectForUser(result.data.user, this.redirectTarget);
                     window.location.href = target;
                 } else {
                     this.resetTurnstile('login');
@@ -1462,6 +1522,7 @@ function authPage() {
             }
         },
         async submitRegister() {
+            if (this.loading) return;
             if (!this.validateStep1(true) || !this.validateStep2(true)) return;
             if ((!this.googlePendingToken || this.regData.password) && this.regData.password !== this.regData.password_confirmation) {
                 Swal.fire({ icon: 'warning', title: 'Kata Sandi Tidak Cocok', text: 'Kata sandi dan konfirmasi kata sandi harus sama.', confirmButtonColor: '#0D7A5F' });
@@ -1500,7 +1561,9 @@ function authPage() {
                     headers,
                     body: JSON.stringify(payload),
                 });
-                const result = await res.json();
+                const raw = await res.text();
+                let result = {};
+                try { result = raw ? JSON.parse(raw) : {}; } catch (_) {}
                 if (res.ok) {
                     localStorage.setItem('pos_token', result.data.token);
                     localStorage.setItem('pos_user', JSON.stringify(result.data.user));
@@ -1510,7 +1573,7 @@ function authPage() {
                         text: 'Akun Anda siap digunakan. Pilih paket langganan untuk membuka penuh seluruh akses kasir cabang atau jadwalkan konsultasi fitur kapan saja.',
                         confirmButtonColor: '#0D7A5F',
                     }).then(() => {
-                        window.location.href = this.redirectTarget || '/dashboard?tab=billing';
+                        window.location.href = this.sanitizeRedirectUrl(this.redirectTarget) || '/dashboard?tab=billing';
                     });
                 } else {
                     this.resetTurnstile('register');

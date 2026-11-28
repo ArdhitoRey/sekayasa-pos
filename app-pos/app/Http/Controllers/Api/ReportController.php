@@ -33,6 +33,9 @@ class ReportController extends Controller
         }
         $businessId = $user->business_id;
         $requestedOutletId = $request->query('outlet_id');
+        if ($user->role === 'cashier' && !$user->outlet_id) {
+            return response()->json(['status' => 'error', 'message' => 'Akun kasir belum ditugaskan ke outlet.'], 403);
+        }
         if ($requestedOutletId) {
             Outlet::where('business_id', $businessId)->findOrFail($requestedOutletId);
             if ($user->role === 'cashier' && $user->outlet_id && (int) $requestedOutletId !== (int) $user->outlet_id) {
@@ -78,13 +81,13 @@ class ReportController extends Controller
             ->limit(5)
             ->get();
 
-        // 4. Payment Method Breakdown (Last 30 Days)
-        $paymentBreakdown = Payment::whereHas('transaction', function ($q) use ($businessId, $outletId) {
-                $q->where('business_id', $businessId)->where('payment_status', 'paid');
-                if ($outletId) $q->where('outlet_id', $outletId);
-            })
-            ->select('payment_method', DB::raw('COUNT(*) as count'), DB::raw('SUM(amount_paid - change_amount) as total_amount'))
-            ->groupBy('payment_method')
+        // 4. Payment Method Breakdown (Accurate transaction total_amount, excluding cash overpay inflation)
+        $paymentBreakdown = Payment::join('transactions as t', 't.id', '=', 'payments.transaction_id')
+            ->where('t.business_id', $businessId)
+            ->where('t.payment_status', 'paid')
+            ->when($outletId, fn ($q) => $q->where('t.outlet_id', $outletId))
+            ->select('payments.payment_method', DB::raw('COUNT(*) as count'), DB::raw('SUM(t.total_amount) as total_amount'))
+            ->groupBy('payments.payment_method')
             ->get();
 
         // 5. Last 7 Days Sales Trend
@@ -138,10 +141,12 @@ class ReportController extends Controller
         }
         $startDate = $request->query('start_date', Carbon::today()->startOfMonth()->toDateString());
         $endDate = $request->query('end_date', Carbon::today()->toDateString());
+        $startAt = Carbon::parse($startDate)->startOfDay();
+        $endAt = Carbon::parse($endDate)->endOfDay();
 
         $query = Transaction::where('business_id', $businessId)
             ->where('payment_status', 'paid')
-            ->whereBetween(DB::raw('DATE(created_at)'), [$startDate, $endDate])
+            ->whereBetween('created_at', [$startAt, $endAt])
             ->with(['items', 'payment', 'cashier', 'outlet']);
 
         if ($outletId) {
@@ -154,6 +159,15 @@ class ReportController extends Controller
         }
 
         $transactions = $query->latest()->get();
+
+        // Admin cannot view secret supplier cost (buy_price / HPP) in sales report items
+        if ($user->role !== 'owner') {
+            $transactions->each(function ($txn) {
+                if ($txn->relationLoaded('items') && $txn->items) {
+                    $txn->items->each->makeHidden('buy_price');
+                }
+            });
+        }
 
         $totalSales = $transactions->sum('total_amount');
         $totalDiscount = $transactions->sum('discount_total');
@@ -186,35 +200,38 @@ class ReportController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Laporan modal (HPP) dan laba kotor hanya dapat diakses oleh Pemilik Bisnis (Owner).'], 403);
         }
         $businessId = $user->business_id;
-        $outletId = $request->query('outlet_id', $user->outlet_id);
+        $outletId = $request->query('outlet_id');
         if ($outletId) {
             Outlet::where('business_id', $businessId)->findOrFail($outletId);
         }
         $startDate = $request->query('start_date', Carbon::today()->startOfMonth()->toDateString());
         $endDate = $request->query('end_date', Carbon::today()->toDateString());
+        $startAt = Carbon::parse($startDate)->startOfDay();
+        $endAt = Carbon::parse($endDate)->endOfDay();
 
-        $items = TransactionItem::whereHas('transaction', function ($q) use ($businessId, $outletId, $startDate, $endDate) {
-            $q->where('business_id', $businessId)
-              ->where('payment_status', 'paid')
-              ->whereBetween(DB::raw('DATE(created_at)'), [$startDate, $endDate]);
-            if ($outletId) $q->where('outlet_id', $outletId);
-        })
-        ->select(
-            'product_name',
-            DB::raw('SUM(quantity) as qty_sold'),
-            DB::raw('AVG(buy_price) as avg_buy_price'),
-            DB::raw('AVG(sell_price) as avg_sell_price'),
-            DB::raw('SUM(buy_price * quantity) as total_cogs'),
-            DB::raw('SUM(subtotal) as total_revenue'),
-            DB::raw('SUM(subtotal - (buy_price * quantity)) as gross_profit')
-        )
-        ->groupBy('product_name')
-        ->orderByDesc('gross_profit')
-        ->get();
+        $netFactorSql = 'CASE WHEN t.subtotal > t.discount_total THEN ((t.subtotal - t.discount_total) * 1.0) / t.subtotal ELSE (CASE WHEN t.subtotal > 0 THEN 0 ELSE 1 END) END';
 
-        $totalRevenue = $items->sum('total_revenue');
-        $totalCogs = $items->sum('total_cogs');
-        $totalGrossProfit = $items->sum('gross_profit');
+        $items = TransactionItem::join('transactions as t', 't.id', '=', 'transaction_items.transaction_id')
+            ->where('t.business_id', $businessId)
+            ->where('t.payment_status', 'paid')
+            ->whereBetween('t.created_at', [$startAt, $endAt])
+            ->when($outletId, fn ($q) => $q->where('t.outlet_id', $outletId))
+            ->select(
+                'transaction_items.product_name',
+                DB::raw('SUM(transaction_items.quantity) as qty_sold'),
+                DB::raw('CASE WHEN SUM(transaction_items.quantity) > 0 THEN SUM(transaction_items.buy_price * transaction_items.quantity) / SUM(transaction_items.quantity) ELSE 0 END as avg_buy_price'),
+                DB::raw('CASE WHEN SUM(transaction_items.quantity) > 0 THEN SUM(transaction_items.sell_price * transaction_items.quantity) / SUM(transaction_items.quantity) ELSE 0 END as avg_sell_price'),
+                DB::raw('SUM(transaction_items.buy_price * transaction_items.quantity) as total_cogs'),
+                DB::raw("SUM(transaction_items.subtotal * ({$netFactorSql})) as total_revenue"),
+                DB::raw("SUM((transaction_items.subtotal * ({$netFactorSql})) - (transaction_items.buy_price * transaction_items.quantity)) as gross_profit")
+            )
+            ->groupBy('transaction_items.product_name')
+            ->orderByDesc('gross_profit')
+            ->get();
+
+        $totalRevenue = round((float) $items->sum('total_revenue'), 2);
+        $totalCogs = round((float) $items->sum('total_cogs'), 2);
+        $totalGrossProfit = round((float) $items->sum('gross_profit'), 2);
         $marginPercentage = $totalRevenue > 0 ? round(($totalGrossProfit / $totalRevenue) * 100, 2) : 0;
 
         return response()->json([

@@ -8,6 +8,7 @@ use App\Models\Business;
 use App\Models\ClientLead;
 use App\Models\Outlet;
 use App\Models\Plan;
+use App\Models\Product;
 use App\Models\Subscription;
 use App\Models\SubscriptionPayment;
 use App\Models\SupportTicket;
@@ -17,6 +18,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 
 class AdminController extends Controller
 {
@@ -369,6 +371,12 @@ class AdminController extends Controller
             'transactions_count' => $business->transactions_count,
         ];
 
+        $productImagePaths = Product::where('business_id', $business->id)
+            ->pluck('image_path')
+            ->filter(fn ($p) => !empty($p) && !str_starts_with($p, '/assets/') && !str_starts_with($p, 'http'))
+            ->values()
+            ->all();
+
         DB::transaction(function () use ($business) {
             $userIds = User::where('business_id', $business->id)
                 ->where('role', '!=', 'superadmin')
@@ -393,6 +401,10 @@ class AdminController extends Controller
             }
             $business->delete();
         });
+
+        foreach ($productImagePaths as $imgPath) {
+            Storage::disk('public')->delete($imgPath);
+        }
 
         ActivityLog::record(
             null,

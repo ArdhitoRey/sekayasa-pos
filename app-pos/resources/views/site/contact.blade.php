@@ -41,8 +41,23 @@
             </div>
         </div>
 
-        <!-- LOGGED-IN CONSULTATION WORKSPACE -->
-        <div x-show="isLoggedIn" class="space-y-8" x-cloak>
+        <!-- NON-OWNER ROLE NOTICE (Cashier / Admin / Super Admin) -->
+        <div x-show="isLoggedIn && !isOwnerAccount" x-cloak class="max-w-3xl mx-auto bg-white border border-[rgba(13,38,32,0.14)] rounded-[14px] p-5 sm:p-8 space-y-5">
+            <div>
+                <span class="section-index">Khusus Pemilik Usaha (Owner)</span>
+                <h2 class="split-title">Pengajuan Konsultasi Hanya Tersedia untuk Akun Pemilik</h2>
+                <p class="split-desc">
+                    Anda saat ini masuk sebagai <b x-text="loggedInUser.role"></b> (<span x-text="loggedInUser.email"></span>). Permintaan penambahan fitur POS hanya dapat diajukan oleh akun <b>Owner</b> pemilik bisnis.
+                </p>
+            </div>
+            <div class="border-t border-[rgba(13,38,32,0.12)] pt-5 flex flex-wrap gap-3">
+                <a :href="dashboardTarget" class="btn btn-jade btn-lg">Kembali ke Panel Akun →</a>
+                <a href="/login?redirect={{ urlencode('/contact') }}" class="btn btn-outline-dark btn-lg">Ganti ke Akun Pemilik</a>
+            </div>
+        </div>
+
+        <!-- LOGGED-IN OWNER CONSULTATION WORKSPACE -->
+        <div x-show="isOwnerAccount" class="space-y-8" x-cloak>
             <div class="bg-[#0D2620] text-white border border-[rgba(52,211,153,0.3)] rounded-[14px] p-5 flex flex-wrap items-center justify-between gap-4">
                 <div>
                     <span class="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 bg-[#34D399] text-[#0D2620] rounded-full">Sedang Login</span>
@@ -51,7 +66,7 @@
                         <span class="text-[#B8D0C9] font-normal" x-text="' — ' + (loggedInUser.business ? loggedInUser.business.name : loggedInUser.email)"></span>
                     </div>
                 </div>
-                <a href="/dashboard?tab=consultation" class="btn btn-mint btn-sm">
+                <a :href="dashboardTarget" class="btn btn-mint btn-sm">
                     Lihat Riwayat di Akun Saya →
                 </a>
             </div>
@@ -193,16 +208,20 @@
 <script>
 function consultationWidget() {
     const token = localStorage.getItem('pos_token') || '';
-    const user = JSON.parse(localStorage.getItem('pos_user') || '{}');
-    const pad = (n) => String(n).padStart(2, '0');
+    const user = (() => { try { return JSON.parse(localStorage.getItem('pos_user') || '{}') || {}; } catch (_) { localStorage.removeItem('pos_user'); return {}; } })();
     const toLocalDate = (daysAhead) => {
-        const d = new Date();
-        d.setDate(d.getDate() + daysAhead);
-        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        const d = new Date(Date.now() + (Number(daysAhead || 0) * 86400000));
+        return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(d);
     };
     return {
         token: token,
         isLoggedIn: Boolean(token && user && user.id),
+        get isOwnerAccount() {
+            return Boolean(this.isLoggedIn && this.loggedInUser && this.loggedInUser.role === 'owner');
+        },
+        get dashboardTarget() {
+            return (this.loggedInUser && this.loggedInUser.role === 'cashier') ? '/pos' : '/dashboard?tab=consultation';
+        },
         loggedInUser: user,
         sectors: ['F&B / Restoran / Kafe', 'Retail / Toko / Grosir', 'Apotek / Klinik', 'Jasa / Bengkel / Barbershop', 'Lainnya'],
         scales: ['1 Outlet', '2–5 Cabang', 'Lebih dari 5 Cabang'],
@@ -239,6 +258,11 @@ function consultationWidget() {
             return `https://wa.me/${waNumber}?text=${encodeURIComponent(this.summaryMessage)}`;
         },
         async submitConsultationFromContact() {
+            if (this.submitting) return;
+            if (!this.isOwnerAccount) {
+                Swal.fire({ icon: 'warning', title: 'Akses Terbatas', text: 'Pengajuan konsultasi hanya dapat dilakukan oleh akun Pemilik Usaha (Owner).', confirmButtonColor: '#0D7A5F' });
+                return;
+            }
             if (this.selectedSector === 'Lainnya' && (this.otherSector || '').trim().length < 3) {
                 Swal.fire({ icon: 'warning', title: 'Bidang Usaha Lainnya', text: 'Mohon tulis bidang usaha Anda terlebih dahulu.', confirmButtonColor: '#0D7A5F' });
                 return;
@@ -263,7 +287,15 @@ function consultationWidget() {
                         template_gap_notes: notes,
                     }),
                 });
-                const result = await res.json();
+                if (res.status === 401) {
+                    localStorage.removeItem('pos_token');
+                    localStorage.removeItem('pos_user');
+                    window.location.href = '/login?redirect=' + encodeURIComponent('/contact');
+                    return;
+                }
+                const raw = await res.text();
+                let result = {};
+                try { result = raw ? JSON.parse(raw) : {}; } catch (_) {}
                 if (res.ok) {
                     const waTarget = result.whatsapp_url || this.whatsappUrl;
                     window.open(waTarget, '_blank', 'noopener');
@@ -277,8 +309,11 @@ function consultationWidget() {
                         window.location.href = '/dashboard?tab=consultation';
                     });
                 } else {
-                    Swal.fire({ icon: 'error', title: 'Gagal', text: result.message || 'Periksa kembali isian Anda', confirmButtonColor: '#0D7A5F' });
+                    const firstErr = result.errors ? Object.values(result.errors).flat()[0] : null;
+                    Swal.fire({ icon: 'error', title: 'Gagal Mengirim Pengajuan', text: firstErr || result.message || 'Periksa kembali isian Anda', confirmButtonColor: '#0D7A5F' });
                 }
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'Koneksi Gagal', text: e.message || 'Tidak dapat menghubungi server saat menyimpan pengajuan.', confirmButtonColor: '#0D7A5F' });
             } finally {
                 this.submitting = false;
             }

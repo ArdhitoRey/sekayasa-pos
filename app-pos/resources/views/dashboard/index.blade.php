@@ -319,6 +319,20 @@
                 </div>
             </div>
 
+            <!-- Workspace Locked Notice for Admin with all Admin permissions disabled -->
+            <div x-show="tab === 'locked_permissions'" class="flex-1 min-h-0 flex items-center justify-center p-6" x-cloak>
+                <div class="max-w-md w-full bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden relative p-6 pl-7 space-y-3">
+                    <div class="absolute inset-y-0 left-0 w-1 bg-slate-500"></div>
+                    <div class="w-11 h-11 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 flex items-center justify-center">
+                        <i data-lucide="shield-off" class="w-5 h-5"></i>
+                    </div>
+                    <h3 class="text-sm font-bold text-[#0D2620]">Tidak Ada Modul Admin yang Diaktifkan</h3>
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        Pemilik bisnis saat ini menonaktifkan seluruh modul backoffice untuk peran <b>Admin</b>. Hubungi Pemilik bisnis untuk mengaktifkan hak akses yang Anda butuhkan.
+                    </p>
+                </div>
+            </div>
+
             <!-- TAB 1: OVERVIEW -->
             <div x-show="tab === 'overview'" class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar space-y-5 sm:space-y-6 sm:pr-1" x-cloak>
                 <!-- Structured Metric Strip (Flat, Hairline Bordered) -->
@@ -636,7 +650,7 @@
                                     <td colspan="4" class="py-12 px-6 text-center">
                                         <div class="text-xs font-semibold text-slate-700">Belum ada kategori tersimpan</div>
                                         <p class="text-[11px] text-slate-400 mt-1 max-w-md mx-auto">Kategori awal sengaja dikosongkan agar setiap bisnis bebas menyusun kategori menunya sendiri.</p>
-                                        <button type="button" @click="openCreateCategoryModal()" class="mt-3 px-4 py-1.5 bg-[#0D7A5F] text-white rounded-md text-xs font-bold hover:bg-[#095C47] transition">+ Buat Kategori Pertama</button>
+                                        <button x-show="user && (user.role === 'owner' || hasFeature('admin_manage_categories'))" type="button" @click="openCreateCategoryModal()" class="mt-3 px-4 py-1.5 bg-[#0D7A5F] text-white rounded-md text-xs font-bold hover:bg-[#095C47] transition">+ Buat Kategori Pertama</button>
                                     </td>
                                 </tr>
                             </tbody>
@@ -731,7 +745,7 @@
                             <button x-show="invSearch" type="button" @click="invSearch = ''; invPage = 1" class="absolute right-2 top-1.5 text-slate-400 hover:text-slate-700 text-xs">✕</button>
                         </div>
 
-                        <button @click="showAdjustmentModal = true" class="w-full sm:w-auto px-3.5 py-1.5 bg-[#0D7A5F] hover:bg-[#095C47] text-[#F7FAF9] rounded-md text-xs font-bold transition">
+                        <button @click="openAdjustmentModal()" class="w-full sm:w-auto px-3.5 py-1.5 bg-[#0D7A5F] hover:bg-[#095C47] text-[#F7FAF9] rounded-md text-xs font-bold transition">
                             Penyesuaian Stok
                         </button>
                     </div>
@@ -2463,6 +2477,24 @@
         <div class="tandha-modal-card bg-[#F7FAF9] rounded-xl max-w-sm w-full p-6 border">
             <h3 class="text-sm font-bold text-[#0D2620] mb-3">Penyesuaian Stok</h3>
             <form @submit.prevent="submitAdjustment()" class="space-y-3 text-xs">
+                <div class="relative" @click.outside="if (openDropdown === 'adjOutlet') openDropdown = null">
+                    <label class="block text-[10px] font-bold uppercase text-[#3D544E] mb-1">Outlet Cabang *</label>
+                    <button type="button" @click="toggleDropdown('adjOutlet')"
+                        class="w-full px-3 py-2 bg-white border border-[rgba(15,23,42,0.14)] rounded flex items-center justify-between text-left font-semibold text-[#0D2620]">
+                        <span class="truncate" x-text="selectedAdjOutletLabel"></span>
+                        <svg class="w-3.5 h-3.5 text-[#3D544E] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
+                    </button>
+                    <div x-show="openDropdown === 'adjOutlet'" x-transition class="absolute left-0 right-0 mt-1 bg-white border border-[rgba(13,38,32,0.16)] rounded-md shadow-xl z-50 max-h-44 overflow-y-auto custom-scrollbar py-1">
+                        <template x-for="o in outlets" :key="'ao-' + o.id">
+                            <button type="button" @click="adjOutletId = o.id; openDropdown = null"
+                                class="w-full px-3 py-2 text-left flex justify-between hover:bg-[#F7FAF9]"
+                                :class="String(adjOutletId) === String(o.id) ? 'bg-[#E6F4EF]/70 font-bold text-[#0D7A5F]' : 'text-[#0D2620]'">
+                                <span class="truncate" x-text="o.name"></span>
+                                <span x-show="String(adjOutletId) === String(o.id)">✓</span>
+                            </button>
+                        </template>
+                    </div>
+                </div>
                 <div class="relative" @click.outside="if (openDropdown === 'adjProd') openDropdown = null">
                     <label class="block text-[10px] font-bold uppercase text-[#3D544E] mb-1">Produk</label>
                     <button type="button" @click="toggleDropdown('adjProd')"
@@ -2525,7 +2557,7 @@
                     <div class="relative" @click.outside="if (openDropdown === 'createProdCat') openDropdown = null">
                         <div class="flex items-center justify-between mb-1">
                             <label class="block text-[10px] font-bold uppercase text-[#3D544E]">Kategori</label>
-                            <button type="button" @click="openCreateCategoryModal()" class="text-[10px] font-bold text-[#0D7A5F] hover:underline">+ Buat Kategori</button>
+                            <button x-show="user && (user.role === 'owner' || hasFeature('admin_manage_categories'))" type="button" @click="openCreateCategoryModal()" class="text-[10px] font-bold text-[#0D7A5F] hover:underline">+ Buat Kategori</button>
                         </div>
                         <button type="button" @click="toggleDropdown('createProdCat')"
                             class="w-full px-3 py-2 bg-white border border-slate-200 hover:border-[#0D7A5F] rounded text-left text-xs text-slate-800 flex items-center justify-between gap-2 transition">
@@ -2557,10 +2589,10 @@
                     <input type="text" x-model="newProduct.sku" placeholder="SKU (Opsional)" class="w-full px-3 py-2 bg-[#FFFFFF] border border-[rgba(15,23,42,0.12)] rounded">
                     <input type="text" x-model="newProduct.barcode" placeholder="Barcode (Opsional)" class="w-full px-3 py-2 bg-[#FFFFFF] border border-[rgba(15,23,42,0.12)] rounded">
                 </div>
-                <div class="grid grid-cols-2 gap-2">
-                    <div>
+                <div class="grid gap-2" :class="user && user.role === 'owner' ? 'grid-cols-2' : 'grid-cols-1'">
+                    <div x-show="user && user.role === 'owner'">
                         <label class="block text-[10px] font-bold uppercase text-[#3D544E] mb-1">Harga Beli / Modal *</label>
-                        <input type="number" x-model.number="newProduct.buy_price" required min="0" placeholder="Harga Beli" class="w-full px-3 py-2 bg-[#FFFFFF] border border-[rgba(15,23,42,0.12)] rounded">
+                        <input type="number" x-model.number="newProduct.buy_price" :required="user && user.role === 'owner'" min="0" placeholder="Harga Beli" class="w-full px-3 py-2 bg-[#FFFFFF] border border-[rgba(15,23,42,0.12)] rounded">
                     </div>
                     <div>
                         <label class="block text-[10px] font-bold uppercase text-[#3D544E] mb-1">Harga Jual *</label>
@@ -2598,7 +2630,7 @@
                 <div class="relative" @click.outside="if (openDropdown === 'editProdCat') openDropdown = null">
                     <div class="flex items-center justify-between mb-1">
                         <label class="block text-[10px] font-bold uppercase text-[#3D544E]">Kategori</label>
-                        <button type="button" @click="openCreateCategoryModal()" class="text-[10px] font-bold text-[#0D7A5F] hover:underline">+ Buat Kategori</button>
+                        <button x-show="user && (user.role === 'owner' || hasFeature('admin_manage_categories'))" type="button" @click="openCreateCategoryModal()" class="text-[10px] font-bold text-[#0D7A5F] hover:underline">+ Buat Kategori</button>
                     </div>
                     <button type="button" @click="toggleDropdown('editProdCat')"
                         class="w-full px-3 py-2 bg-white border border-slate-200 hover:border-[#0D7A5F] rounded text-left text-xs text-slate-800 flex items-center justify-between gap-2 transition">
@@ -2625,10 +2657,10 @@
                     <input type="text" x-model="editProduct.sku" placeholder="SKU" class="w-full px-3 py-2 bg-[#FFFFFF] border border-[rgba(15,23,42,0.12)] rounded">
                     <input type="text" x-model="editProduct.barcode" placeholder="Barcode" class="w-full px-3 py-2 bg-[#FFFFFF] border border-[rgba(15,23,42,0.12)] rounded">
                 </div>
-                <div class="grid grid-cols-2 gap-2">
-                    <div>
+                <div class="grid gap-2" :class="user && user.role === 'owner' ? 'grid-cols-2' : 'grid-cols-1'">
+                    <div x-show="user && user.role === 'owner'">
                         <label class="block text-[10px] font-bold uppercase text-[#3D544E] mb-1">Harga Beli</label>
-                        <input type="number" x-model.number="editProduct.buy_price" required min="0" class="w-full px-3 py-2 bg-[#FFFFFF] border border-[rgba(15,23,42,0.12)] rounded">
+                        <input type="number" x-model.number="editProduct.buy_price" :required="user && user.role === 'owner'" min="0" class="w-full px-3 py-2 bg-[#FFFFFF] border border-[rgba(15,23,42,0.12)] rounded">
                     </div>
                     <div>
                         <label class="block text-[10px] font-bold uppercase text-[#3D544E] mb-1">Harga Jual</label>
@@ -3274,7 +3306,7 @@
     </div>
 
     <!-- Modal Nota / Kwitansi Resmi Pembayaran Langganan -->
-    <div x-show="showSubReceiptModal" @click.self="showSubReceiptModal = false" class="fixed inset-0 bg-[#0D2620]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" x-cloak>
+    <div x-show="showSubReceiptModal" @click.self="showSubReceiptModal = false" class="tandha-print-overlay fixed inset-0 bg-[#0D2620]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" x-cloak>
         <div class="tandha-modal-card bg-[#F7FAF9] rounded-xl max-w-xl w-full border overflow-hidden flex flex-col max-h-[90vh]">
             <div class="bg-[#0D2620] text-white px-5 py-3.5 flex items-center justify-between shrink-0">
                 <div>
@@ -3283,7 +3315,7 @@
                 </div>
                 <button type="button" @click="showSubReceiptModal = false" class="text-slate-300 hover:text-white text-sm">✕</button>
             </div>
-            <div class="flex-1 overflow-y-auto custom-scrollbar p-5">
+            <div class="flex-1 overflow-y-auto custom-scrollbar p-5 tandha-print-scroll-reset">
                 <div id="printable-sub-receipt" class="bg-white border border-slate-200 rounded-lg p-6 space-y-4 text-xs text-slate-800">
                     <div class="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 pb-4">
                         <div>
@@ -3437,7 +3469,7 @@
                 </div>
                 <div :class="previewDevice === 'mobile' ? 'w-full max-w-[440px] h-full rounded-[26px] border-[8px] border-[#0D2620] shadow-2xl bg-white overflow-hidden transition-all duration-200' : 'w-full h-full rounded-lg border border-slate-200 bg-white overflow-hidden transition-all duration-200'">
                     <template x-if="showPosPreviewModal">
-                        <iframe :src="posPreviewIframeUrl" @load="previewIframeLoading = false" title="Preview Layar Kasir POS" class="w-full h-full border-0 bg-[#F7FAF9]"></iframe>
+                        <iframe :src="posPreviewIframeUrl" @load="finishPosPreviewLoad()" title="Preview Layar Kasir POS" class="w-full h-full border-0 bg-[#F7FAF9]"></iframe>
                     </template>
                 </div>
             </div>
@@ -3466,7 +3498,7 @@ function dashboardApp() {
         mobileMenuOpen: false,
         initialServerTab: @json($initialTab ?? ''),
         token: localStorage.getItem('pos_token') || '',
-        user: JSON.parse(localStorage.getItem('pos_user') || '{}'),
+        user: (() => { try { return JSON.parse(localStorage.getItem('pos_user') || '{}') || {}; } catch (_) { localStorage.removeItem('pos_user'); return {}; } })(),
         business: {},
         outlets: [],
         selectedOutletId: '',
@@ -3728,12 +3760,13 @@ function dashboardApp() {
             { value: 'initial', label: 'Stok Awal' },
         ],
         showAdjustmentModal: false,
+        adjOutletId: '',
         adjProduct: '',
         adjType: 'adjustment_add',
         adjQty: 10,
         adjReason: '',
-        reportStartDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-        reportEndDate: new Date().toISOString().split('T')[0],
+        reportStartDate: (() => { const d = new Date(); d.setDate(1); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split('T')[0]; })(),
+        reportEndDate: (() => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split('T')[0]; })(),
         reportSubTab: 'summary',
         repSearch: '',
         repPayFilter: 'all',
@@ -4146,6 +4179,10 @@ function dashboardApp() {
             const months = Number(this.billingDurationMonths || 1);
             return pl ? Number(pl.price_monthly || 0) * months : 0;
         },
+        get selectedAdjOutletLabel() {
+            const found = this.outlets.find((o) => String(o.id) === String(this.adjOutletId));
+            return found ? found.name : 'Pilih Outlet Cabang';
+        },
         get selectedAdjProductLabel() {
             const found = this.productList.find((p) => String(p.id) === String(this.adjProduct));
             return found ? `${found.name} (Stok: ${found.current_stock})` : 'Pilih Produk';
@@ -4357,7 +4394,7 @@ function dashboardApp() {
             if (this.hasFeature('admin_manage_products') || this.hasFeature('admin_manage_categories')) return 'products';
             if (this.hasFeature('admin_manage_inventory')) return 'inventory';
             if (this.hasFeature('admin_view_sales_report') || this.hasFeature('admin_view_shift_history')) return 'reports';
-            return 'overview';
+            return 'locked_permissions';
         },
 
         async initDashboard() {
@@ -4398,12 +4435,20 @@ function dashboardApp() {
             this.selectedClientDetail = { business: { outlets: [] }, subscription_summary: {}, activity_logs: [], users: [], payments: [], transactions: [] };
             this.clientDetailTab = 'logs';
             this.showClientDetailModal = true;
-            const res = await this.authFetch(`/api/admin/businesses/${businessId}`);
-            const result = await res.json();
-            if (res.ok && result.data) {
-                this.selectedClientDetail = result.data;
-                const currentPlanId = result.data.subscription_summary?.plan_id || (this.adminPlans[0]?.id || '');
-                this.extendForm = { plan_id: currentPlanId, days: 30, status: 'active' };
+            try {
+                const res = await this.authFetch(`/api/admin/businesses/${businessId}`);
+                const result = await res.json().catch(() => ({}));
+                if (res.ok && result.data) {
+                    this.selectedClientDetail = result.data;
+                    const currentPlanId = result.data.subscription_summary?.plan_id || (this.adminPlans[0]?.id || '');
+                    this.extendForm = { plan_id: currentPlanId, days: 30, status: 'active' };
+                } else {
+                    this.showClientDetailModal = false;
+                    Swal.fire({ icon: 'error', title: 'Gagal Memuat Detail', text: result.message || 'Data bisnis tidak dapat dimuat.', confirmButtonColor: '#0D7A5F' });
+                }
+            } catch (e) {
+                this.showClientDetailModal = false;
+                Swal.fire({ icon: 'error', title: 'Gagal Memuat Detail', text: e.message || 'Koneksi ke server terputus.', confirmButtonColor: '#0D7A5F' });
             }
         },
         openActivateModal(businessObj) {
@@ -4456,13 +4501,21 @@ function dashboardApp() {
                 cancelButtonText: 'Batal',
                 confirmButtonColor: willFreeze ? '#D97706' : '#0D7A5F',
             });
-            if (!isConfirmed) return;
-
-            const res = await this.authFetch(`/api/admin/businesses/${businessObj.id}/toggle-status`, { method: 'POST' });
-            const result = await res.json();
-            if (res.ok) {
-                Swal.fire({ icon: 'success', title: 'Akses Login Diperbarui', text: result.message, confirmButtonColor: '#0D7A5F' });
-                await this.loadAdminPlatform();
+            if (!isConfirmed || this.isSaving) return;
+            this.isSaving = true;
+            try {
+                const res = await this.authFetch(`/api/admin/businesses/${businessObj.id}/toggle-status`, { method: 'POST' });
+                const result = await res.json().catch(() => ({}));
+                if (res.ok) {
+                    Swal.fire({ icon: 'success', title: 'Akses Login Diperbarui', text: result.message, confirmButtonColor: '#0D7A5F' });
+                    await this.loadAdminPlatform();
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Gagal Mengubah Status', text: result.message || 'Terjadi kesalahan saat mengubah status bisnis.', confirmButtonColor: '#0D7A5F' });
+                }
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'Gagal Mengubah Status', text: e.message || 'Koneksi ke server terputus.', confirmButtonColor: '#0D7A5F' });
+            } finally {
+                this.isSaving = false;
             }
         },
         async confirmDeleteBusiness(businessObj) {
@@ -4625,7 +4678,7 @@ function dashboardApp() {
             if (result.status === 'success') { this.dashboardData = result.data; this.renderChart(result.data.sales_trend); }
         },
         renderChart(trend) {
-            if (!trend) return;
+            if (!trend || typeof window.Chart === 'undefined') return;
             const ctx = document.getElementById('salesTrendChart');
             if (!ctx) return;
             if (this.salesChartInstance) this.salesChartInstance.destroy();
@@ -4725,6 +4778,9 @@ function dashboardApp() {
             }
         },
         openCreateProductModal() {
+            if (this.newProductPreview && this.newProductPreview.startsWith('blob:')) {
+                URL.revokeObjectURL(this.newProductPreview);
+            }
             this.newProduct = { name: '', category_id: '', sku: '', barcode: '', buy_price: 0, sell_price: 0, initial_stock: 50 };
             this.newProductFile = null;
             this.newProductPreview = '';
@@ -4734,39 +4790,55 @@ function dashboardApp() {
         },
         onCreateProductFileChange(evt) {
             const file = evt.target.files[0];
+            if (this.newProductPreview && this.newProductPreview.startsWith('blob:')) {
+                URL.revokeObjectURL(this.newProductPreview);
+            }
             this.newProductFile = file || null;
             this.newProductPreview = file ? URL.createObjectURL(file) : '';
         },
         async submitCreateProduct() {
+            if (this.isSaving) return;
             if (!this.newProductFile) {
                 Swal.fire({ icon: 'warning', title: 'Gambar Wajib Diisi', text: 'Silakan unggah foto/gambar produk terlebih dahulu.', confirmButtonColor: '#0D7A5F' });
                 return;
             }
-            const fd = new FormData();
-            fd.append('name', this.newProduct.name);
-            if (this.newProduct.category_id) fd.append('category_id', this.newProduct.category_id);
-            if (this.newProduct.sku) fd.append('sku', this.newProduct.sku);
-            if (this.newProduct.barcode) fd.append('barcode', this.newProduct.barcode);
-            fd.append('buy_price', String(this.newProduct.buy_price ?? 0));
-            fd.append('sell_price', String(this.newProduct.sell_price ?? 0));
-            fd.append('initial_stock', String(this.newProduct.initial_stock ?? 0));
-            fd.append('outlet_id', String(this.selectedOutletId || (this.outlets[0] ? this.outlets[0].id : 1)));
-            fd.append('image', this.newProductFile);
+            this.isSaving = true;
+            try {
+                const fd = new FormData();
+                fd.append('name', this.newProduct.name);
+                if (this.newProduct.category_id) fd.append('category_id', this.newProduct.category_id);
+                if (this.newProduct.sku) fd.append('sku', this.newProduct.sku);
+                if (this.newProduct.barcode) fd.append('barcode', this.newProduct.barcode);
+                if (this.user && this.user.role === 'owner') {
+                    fd.append('buy_price', String(this.newProduct.buy_price ?? 0));
+                }
+                fd.append('sell_price', String(this.newProduct.sell_price ?? 0));
+                fd.append('initial_stock', String(this.newProduct.initial_stock ?? 0));
+                fd.append('outlet_id', String(this.selectedOutletId || (this.outlets[0] ? this.outlets[0].id : 1)));
+                fd.append('image', this.newProductFile);
 
-            const res = await this.authFetch('/api/products', { method: 'POST', body: fd });
-            const result = await res.json();
-            if (res.ok) {
-                this.showCreateProductModal = false;
-                this.newProductFile = null;
-                this.newProductPreview = '';
-                await this.loadProductsTable();
-                this.showSaveSuccessWithPreview('Produk Ditambahkan', result.message);
-            } else {
-                const firstErr = result.errors ? Object.values(result.errors).flat()[0] : null;
-                Swal.fire({ icon: 'error', title: 'Gagal Menambah Produk', text: firstErr || result.message || 'Periksa kembali data & gambar produk.', confirmButtonColor: '#0D7A5F' });
+                const res = await this.authFetch('/api/products', { method: 'POST', body: fd });
+                const result = await res.json().catch(() => ({}));
+                if (res.ok) {
+                    this.showCreateProductModal = false;
+                    this.newProductFile = null;
+                    this.newProductPreview = '';
+                    await this.loadProductsTable();
+                    this.showSaveSuccessWithPreview('Produk Ditambahkan', result.message);
+                } else {
+                    const firstErr = result.errors ? Object.values(result.errors).flat()[0] : null;
+                    Swal.fire({ icon: 'error', title: 'Gagal Menambah Produk', text: firstErr || result.message || 'Periksa kembali data & gambar produk.', confirmButtonColor: '#0D7A5F' });
+                }
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'Gagal Menambah Produk', text: e.message || 'Koneksi ke server terputus.', confirmButtonColor: '#0D7A5F' });
+            } finally {
+                this.isSaving = false;
             }
         },
         openEditProductModal(p) {
+            if (this.editProductPreview && this.editProductPreview.startsWith('blob:')) {
+                URL.revokeObjectURL(this.editProductPreview);
+            }
             this.editProduct = {
                 id: p.id,
                 name: p.name || '',
@@ -4784,34 +4856,62 @@ function dashboardApp() {
         },
         onEditProductFileChange(evt) {
             const file = evt.target.files[0];
+            if (this.editProductPreview && this.editProductPreview.startsWith('blob:')) {
+                URL.revokeObjectURL(this.editProductPreview);
+            }
             this.editProductFile = file || null;
             if (file) this.editProductPreview = URL.createObjectURL(file);
         },
         async submitEditProduct() {
-            if (!this.editProduct.id) return;
-            const fd = new FormData();
-            fd.append('name', this.editProduct.name);
-            if (this.editProduct.category_id) fd.append('category_id', this.editProduct.category_id);
-            if (this.editProduct.sku) fd.append('sku', this.editProduct.sku);
-            if (this.editProduct.barcode) fd.append('barcode', this.editProduct.barcode);
-            fd.append('buy_price', String(this.editProduct.buy_price ?? 0));
-            fd.append('sell_price', String(this.editProduct.sell_price ?? 0));
-            if (this.editProductFile) fd.append('image', this.editProductFile);
+            if (!this.editProduct.id || this.isSaving) return;
+            this.isSaving = true;
+            try {
+                const fd = new FormData();
+                fd.append('name', this.editProduct.name);
+                fd.append('category_id', this.editProduct.category_id ? String(this.editProduct.category_id) : '');
+                fd.append('sku', this.editProduct.sku ? String(this.editProduct.sku) : '');
+                fd.append('barcode', this.editProduct.barcode ? String(this.editProduct.barcode) : '');
+                if (this.user && this.user.role === 'owner') {
+                    fd.append('buy_price', String(this.editProduct.buy_price ?? 0));
+                }
+                fd.append('sell_price', String(this.editProduct.sell_price ?? 0));
+                if (this.editProductFile) fd.append('image', this.editProductFile);
 
-            const res = await this.authFetch(`/api/products/${this.editProduct.id}`, { method: 'POST', body: fd });
-            const result = await res.json();
-            if (res.ok) {
-                this.showEditProductModal = false;
-                await this.loadProductsTable();
-                this.showSaveSuccessWithPreview('Produk Diperbarui', result.message || 'Perubahan menu, harga, atau foto siap ditinjau di Kasir.');
-            } else {
-                const firstErr = result.errors ? Object.values(result.errors).flat()[0] : null;
-                Swal.fire({ icon: 'error', title: 'Gagal Memperbarui', text: firstErr || result.message, confirmButtonColor: '#0D7A5F' });
+                const res = await this.authFetch(`/api/products/${this.editProduct.id}`, { method: 'POST', body: fd });
+                const result = await res.json().catch(() => ({}));
+                if (res.ok) {
+                    this.showEditProductModal = false;
+                    await this.loadProductsTable();
+                    this.showSaveSuccessWithPreview('Produk Diperbarui', result.message || 'Perubahan menu, harga, atau foto siap ditinjau di Kasir.');
+                } else {
+                    const firstErr = result.errors ? Object.values(result.errors).flat()[0] : null;
+                    Swal.fire({ icon: 'error', title: 'Gagal Memperbarui', text: firstErr || result.message || 'Periksa kembali isian produk.', confirmButtonColor: '#0D7A5F' });
+                }
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'Gagal Memperbarui', text: e.message || 'Koneksi ke server terputus.', confirmButtonColor: '#0D7A5F' });
+            } finally {
+                this.isSaving = false;
             }
         },
         async archiveProduct(id) {
-            const { isConfirmed } = await Swal.fire({ title: 'Arsipkan Produk?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#0D7A5F' });
-            if (isConfirmed) { await this.authFetch(`/api/products/${id}`, { method: 'DELETE' }); await this.loadProductsTable(); }
+            if (this.isSaving) return;
+            const { isConfirmed } = await Swal.fire({ title: 'Arsipkan Produk?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#0D7A5F', cancelButtonText: 'Batal', confirmButtonText: 'Arsipkan' });
+            if (!isConfirmed) return;
+            this.isSaving = true;
+            try {
+                const res = await this.authFetch(`/api/products/${id}`, { method: 'DELETE' });
+                const result = await res.json().catch(() => ({}));
+                if (res.ok) {
+                    await this.loadProductsTable();
+                    Swal.fire({ icon: 'success', title: 'Produk Diarsipkan', timer: 1400, showConfirmButton: false });
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Gagal Mengarsipkan', text: result.message || 'Produk tidak dapat diarsipkan.', confirmButtonColor: '#0D7A5F' });
+                }
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'Gagal Mengarsipkan', text: e.message || 'Koneksi ke server terputus.', confirmButtonColor: '#0D7A5F' });
+            } finally {
+                this.isSaving = false;
+            }
         },
         async loadInventoryData() {
             await this.loadProductsTable();
@@ -4820,16 +4920,36 @@ function dashboardApp() {
             const data = await res.json();
             if (data.status === 'success') this.stockMovements = data.data ? data.data.data : [];
         },
+        openAdjustmentModal() {
+            const activeOutlets = (this.outlets || []).filter((o) => o.is_active !== false);
+            const fallbackOutlet = activeOutlets[0] || (this.outlets || [])[0];
+            this.adjOutletId = this.selectedOutletId || (this.user && this.user.outlet_id) || (fallbackOutlet ? fallbackOutlet.id : '');
+            if (!this.adjProduct && (this.productList || []).length > 0) {
+                this.adjProduct = this.productList[0].id;
+            }
+            this.showAdjustmentModal = true;
+        },
         async submitAdjustment() {
-            const res = await this.authFetch('/api/inventory/adjust', {
-                method: 'POST',
-                body: JSON.stringify({ outlet_id: this.selectedOutletId || 1, product_id: this.adjProduct, type: this.adjType, quantity: this.adjQty, reason: this.adjReason }),
-            });
-            if (res.ok) {
-                this.showAdjustmentModal = false;
-                this.adjReason = '';
-                await this.loadInventoryData();
-                this.showSaveSuccessWithPreview('Stok Disesuaikan', 'Saldo stok outlet terbaru langsung tampil di terminal kasir.');
+            if (!this.adjOutletId || !this.adjProduct) {
+                Swal.fire({ icon: 'warning', title: 'Data Belum Lengkap', text: 'Pilih outlet cabang dan produk terlebih dahulu.', confirmButtonColor: '#0D7A5F' });
+                return;
+            }
+            try {
+                const res = await this.authFetch('/api/inventory/adjust', {
+                    method: 'POST',
+                    body: JSON.stringify({ outlet_id: Number(this.adjOutletId), product_id: Number(this.adjProduct), type: this.adjType, quantity: this.adjQty, reason: this.adjReason }),
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    this.showAdjustmentModal = false;
+                    this.adjReason = '';
+                    await this.loadInventoryData();
+                    this.showSaveSuccessWithPreview('Stok Disesuaikan', 'Saldo stok outlet terbaru langsung tampil di terminal kasir.');
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Gagal Menyesuaikan Stok', text: data.message || 'Periksa outlet dan produk yang dipilih.', confirmButtonColor: '#0D7A5F' });
+                }
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'Gagal Menyesuaikan Stok', text: e.message || 'Koneksi ke server terputus.', confirmButtonColor: '#0D7A5F' });
             }
         },
         async loadReports() {
@@ -4894,18 +5014,26 @@ function dashboardApp() {
             this.showCreateStaffModal = true;
         },
         async submitCreateStaff() {
-            const res = await this.authFetch('/api/staff', {
-                method: 'POST',
-                body: JSON.stringify(this.newStaff),
-            });
-            const result = await res.json();
-            if (res.ok) {
-                this.showCreateStaffModal = false;
-                await this.loadStaffData();
-                Swal.fire({ icon: 'success', title: 'Akun Staf Dibuat', text: result.message, confirmButtonColor: '#0D7A5F' });
-            } else {
-                const firstErr = result.errors ? Object.values(result.errors).flat()[0] : null;
-                Swal.fire({ icon: 'error', title: 'Gagal Menambah Staf', text: firstErr || result.message, confirmButtonColor: '#0D7A5F' });
+            if (this.isSaving) return;
+            this.isSaving = true;
+            try {
+                const res = await this.authFetch('/api/staff', {
+                    method: 'POST',
+                    body: JSON.stringify(this.newStaff),
+                });
+                const result = await res.json().catch(() => ({}));
+                if (res.ok) {
+                    this.showCreateStaffModal = false;
+                    await this.loadStaffData();
+                    Swal.fire({ icon: 'success', title: 'Akun Staf Dibuat', text: result.message, confirmButtonColor: '#0D7A5F' });
+                } else {
+                    const firstErr = result.errors ? Object.values(result.errors).flat()[0] : null;
+                    Swal.fire({ icon: 'error', title: 'Gagal Menambah Staf', text: firstErr || result.message || 'Gagal menyimpan akun staf.', confirmButtonColor: '#0D7A5F' });
+                }
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'Gagal Menambah Staf', text: e.message || 'Koneksi ke server terputus.', confirmButtonColor: '#0D7A5F' });
+            } finally {
+                this.isSaving = false;
             }
         },
         openEditStaffModal(member) {
@@ -4920,25 +5048,33 @@ function dashboardApp() {
             this.showEditStaffModal = true;
         },
         async submitEditStaff() {
-            const payload = {
-                name: this.editStaff.name,
-                role: this.editStaff.role,
-                outlet_id: this.editStaff.outlet_id,
-                is_active: this.editStaff.is_active,
-            };
-            if (this.editStaff.password) payload.password = this.editStaff.password;
-            const res = await this.authFetch(`/api/staff/${this.editStaff.id}`, {
-                method: 'PUT',
-                body: JSON.stringify(payload),
-            });
-            const result = await res.json();
-            if (res.ok) {
-                this.showEditStaffModal = false;
-                await this.loadStaffData();
-                Swal.fire({ icon: 'success', title: 'Staf Diperbarui', text: result.message, timer: 1500, showConfirmButton: false });
-            } else {
-                const firstErr = result.errors ? Object.values(result.errors).flat()[0] : null;
-                Swal.fire({ icon: 'error', title: 'Gagal', text: firstErr || result.message, confirmButtonColor: '#0D7A5F' });
+            if (this.isSaving) return;
+            this.isSaving = true;
+            try {
+                const payload = {
+                    name: this.editStaff.name,
+                    role: this.editStaff.role,
+                    outlet_id: this.editStaff.outlet_id,
+                    is_active: this.editStaff.is_active,
+                };
+                if (this.editStaff.password) payload.password = this.editStaff.password;
+                const res = await this.authFetch(`/api/staff/${this.editStaff.id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(payload),
+                });
+                const result = await res.json().catch(() => ({}));
+                if (res.ok) {
+                    this.showEditStaffModal = false;
+                    await this.loadStaffData();
+                    Swal.fire({ icon: 'success', title: 'Staf Diperbarui', text: result.message, timer: 1500, showConfirmButton: false });
+                } else {
+                    const firstErr = result.errors ? Object.values(result.errors).flat()[0] : null;
+                    Swal.fire({ icon: 'error', title: 'Gagal', text: firstErr || result.message || 'Gagal memperbarui akun staf.', confirmButtonColor: '#0D7A5F' });
+                }
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'Gagal', text: e.message || 'Koneksi ke server terputus.', confirmButtonColor: '#0D7A5F' });
+            } finally {
+                this.isSaving = false;
             }
         },
         async deleteStaffMember(member) {
@@ -4951,27 +5087,45 @@ function dashboardApp() {
                 cancelButtonText: 'Batal',
                 confirmButtonColor: '#DC2626',
             });
-            if (!isConfirmed) return;
-            const res = await this.authFetch(`/api/staff/${member.id}`, { method: 'DELETE' });
-            if (res.ok) {
-                await this.loadStaffData();
-                Swal.fire({ icon: 'success', title: 'Staf Dihapus', timer: 1400, showConfirmButton: false });
+            if (!isConfirmed || this.isSaving) return;
+            this.isSaving = true;
+            try {
+                const res = await this.authFetch(`/api/staff/${member.id}`, { method: 'DELETE' });
+                const result = await res.json().catch(() => ({}));
+                if (res.ok) {
+                    await this.loadStaffData();
+                    Swal.fire({ icon: 'success', title: 'Staf Dihapus', timer: 1400, showConfirmButton: false });
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Gagal Menghapus Staf', text: result.message || 'Akun staf tidak dapat dihapus.', confirmButtonColor: '#0D7A5F' });
+                }
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'Gagal Menghapus Staf', text: e.message || 'Koneksi ke server terputus.', confirmButtonColor: '#0D7A5F' });
+            } finally {
+                this.isSaving = false;
             }
         },
         async submitCreateOutlet() {
-            const res = await this.authFetch('/api/outlets', {
-                method: 'POST',
-                body: JSON.stringify(this.newOutlet),
-            });
-            const result = await res.json();
-            if (res.ok) {
-                this.showCreateOutletModal = false;
-                this.newOutlet = { name: '', outlet_code: '', city: '', phone: '', address: '' };
-                await this.loadInitialProfile();
-                Swal.fire({ icon: 'success', title: 'Outlet Ditambahkan', text: result.message, confirmButtonColor: '#0D7A5F' });
-            } else {
-                const firstErr = result.errors ? Object.values(result.errors).flat()[0] : null;
-                Swal.fire({ icon: 'error', title: 'Gagal Menambah Outlet', text: firstErr || result.message, confirmButtonColor: '#0D7A5F' });
+            if (this.isSaving) return;
+            this.isSaving = true;
+            try {
+                const res = await this.authFetch('/api/outlets', {
+                    method: 'POST',
+                    body: JSON.stringify(this.newOutlet),
+                });
+                const result = await res.json().catch(() => ({}));
+                if (res.ok) {
+                    this.showCreateOutletModal = false;
+                    this.newOutlet = { name: '', outlet_code: '', city: '', phone: '', address: '' };
+                    await this.loadInitialProfile();
+                    Swal.fire({ icon: 'success', title: 'Outlet Ditambahkan', text: result.message, confirmButtonColor: '#0D7A5F' });
+                } else {
+                    const firstErr = result.errors ? Object.values(result.errors).flat()[0] : null;
+                    Swal.fire({ icon: 'error', title: 'Gagal Menambah Outlet', text: firstErr || result.message || 'Gagal menambah outlet cabang.', confirmButtonColor: '#0D7A5F' });
+                }
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'Gagal Menambah Outlet', text: e.message || 'Koneksi ke server terputus.', confirmButtonColor: '#0D7A5F' });
+            } finally {
+                this.isSaving = false;
             }
         },
         openEditOutletModal(out) {
@@ -4996,37 +5150,44 @@ function dashboardApp() {
             this.showEditOutletModal = true;
         },
         async submitEditOutlet() {
-            if (!this.editOutletForm.id) return;
-            const cleanedOverrides = {};
-            for (const item of this.cashierFeatureToggleMeta) {
-                const val = this.editOutletForm.feature_overrides[item.key];
-                if (val === true || val === false) cleanedOverrides[item.key] = val;
-            }
-            const payload = {
-                name: this.editOutletForm.name,
-                outlet_code: this.editOutletForm.outlet_code || null,
-                city: this.editOutletForm.city || null,
-                phone: this.editOutletForm.phone || null,
-                address: this.editOutletForm.address || null,
-                is_active: Boolean(this.editOutletForm.is_active),
-                receipt_header: this.editOutletForm.receipt_header || null,
-                receipt_footer: this.editOutletForm.receipt_footer || null,
-                tax_percentage: (this.editOutletForm.tax_percentage !== '' && this.editOutletForm.tax_percentage !== null) ? Number(this.editOutletForm.tax_percentage) : null,
-                feature_overrides: cleanedOverrides,
-            };
-            const res = await this.authFetch(`/api/outlets/${this.editOutletForm.id}`, {
-                method: 'PUT',
-                body: JSON.stringify(payload),
-            });
-            const result = await res.json();
-            if (res.ok) {
-                const savedOutletId = this.editOutletForm.id;
-                this.showEditOutletModal = false;
-                await this.loadInitialProfile();
-                this.showSaveSuccessWithPreview('Pengaturan Cabang Disimpan', result.message, savedOutletId);
-            } else {
-                const firstErr = result.errors ? Object.values(result.errors).flat()[0] : null;
-                Swal.fire({ icon: 'error', title: 'Gagal Memperbarui Cabang', text: firstErr || result.message, confirmButtonColor: '#0D7A5F' });
+            if (!this.editOutletForm.id || this.isSaving) return;
+            this.isSaving = true;
+            try {
+                const cleanedOverrides = {};
+                for (const item of this.cashierFeatureToggleMeta) {
+                    const val = this.editOutletForm.feature_overrides[item.key];
+                    if (val === true || val === false) cleanedOverrides[item.key] = val;
+                }
+                const payload = {
+                    name: this.editOutletForm.name,
+                    outlet_code: this.editOutletForm.outlet_code || null,
+                    city: this.editOutletForm.city || null,
+                    phone: this.editOutletForm.phone || null,
+                    address: this.editOutletForm.address || null,
+                    is_active: Boolean(this.editOutletForm.is_active),
+                    receipt_header: this.editOutletForm.receipt_header || null,
+                    receipt_footer: this.editOutletForm.receipt_footer || null,
+                    tax_percentage: (this.editOutletForm.tax_percentage !== '' && this.editOutletForm.tax_percentage !== null) ? Number(this.editOutletForm.tax_percentage) : null,
+                    feature_overrides: cleanedOverrides,
+                };
+                const res = await this.authFetch(`/api/outlets/${this.editOutletForm.id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(payload),
+                });
+                const result = await res.json().catch(() => ({}));
+                if (res.ok) {
+                    const savedOutletId = this.editOutletForm.id;
+                    this.showEditOutletModal = false;
+                    await this.loadInitialProfile();
+                    this.showSaveSuccessWithPreview('Pengaturan Cabang Disimpan', result.message, savedOutletId);
+                } else {
+                    const firstErr = result.errors ? Object.values(result.errors).flat()[0] : null;
+                    Swal.fire({ icon: 'error', title: 'Gagal Memperbarui Cabang', text: firstErr || result.message || 'Gagal memperbarui cabang.', confirmButtonColor: '#0D7A5F' });
+                }
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'Gagal Memperbarui Cabang', text: e.message || 'Koneksi ke server terputus.', confirmButtonColor: '#0D7A5F' });
+            } finally {
+                this.isSaving = false;
             }
         },
         resetFeatureSettings() {
@@ -5096,8 +5257,14 @@ function dashboardApp() {
                     this.consultationGuard = result.data.consultation_guard || { can_submit: true, reason: null, weekly_used: 0, weekly_limit: 2, active_whatsapp_url: null };
                     if (this.user && !this.consultForm.phone) this.consultForm.phone = this.user.phone || '';
                     if (this.billingPlans.length > 0 && !this.selectedPlanId) {
+                        const requestedPlan = new URLSearchParams(window.location.search).get('plan');
+                        const matchedPlan = requestedPlan
+                            ? this.billingPlans.find((pl) => String(pl.id) === String(requestedPlan) || String(pl.slug || '').toLowerCase() === String(requestedPlan).toLowerCase())
+                            : null;
                         const sub = this.business && this.business.current_subscription;
-                        this.selectedPlanId = (sub && sub.plan_id) ? sub.plan_id : this.billingPlans[0].id;
+                        this.selectedPlanId = matchedPlan
+                            ? matchedPlan.id
+                            : ((sub && sub.plan_id) ? sub.plan_id : this.billingPlans[0].id);
                     }
                     if (result.data.can_install_apk !== undefined) {
                         this.business.can_install_apk = Boolean(result.data.can_install_apk);
@@ -5135,37 +5302,50 @@ function dashboardApp() {
         },
         async checkPaymentStatus(showPendingAlert = false) {
             if (!this.pendingPayment) return;
-            const res = await this.authFetch(`/api/client/payments/${this.pendingPayment.id}/status`, { silent: !showPendingAlert });
-            const result = await res.json();
-            if (res.ok && result.data) {
-                if (result.data.payment_status === 'verified') {
-                    this.stopPaymentPolling();
-                    const paidId = this.pendingPayment.id;
-                    this.pendingPayment = null;
-                    const dlg = await Swal.fire({
-                        icon: 'success',
-                        title: 'Pembayaran Terverifikasi',
-                        text: 'Paket langganan Anda kini aktif dan Nota Pembayaran Resmi telah diterbitkan.',
-                        showCancelButton: true,
-                        confirmButtonText: 'Lihat Nota Lunas',
-                        cancelButtonText: 'Tutup',
-                        confirmButtonColor: '#0D7A5F',
-                    });
-                    await Promise.all([this.loadInitialProfile(), this.loadClientPortalData(), this.loadStaffData()]);
-                    if (dlg.isConfirmed) {
-                        await this.openPaymentReceiptModal(paidId);
+            try {
+                const res = await this.authFetch(`/api/client/payments/${this.pendingPayment.id}/status`, { silent: !showPendingAlert });
+                const result = await res.json().catch(() => ({}));
+                if (res.ok && result.data) {
+                    if (result.data.payment_status === 'verified') {
+                        this.stopPaymentPolling();
+                        const paidId = this.pendingPayment.id;
+                        this.pendingPayment = null;
+                        const dlg = await Swal.fire({
+                            icon: 'success',
+                            title: 'Pembayaran Terverifikasi',
+                            text: 'Paket langganan Anda kini aktif dan Nota Pembayaran Resmi telah diterbitkan.',
+                            showCancelButton: true,
+                            confirmButtonText: 'Lihat Nota Lunas',
+                            cancelButtonText: 'Tutup',
+                            confirmButtonColor: '#0D7A5F',
+                        });
+                        await Promise.all([this.loadInitialProfile(), this.loadClientPortalData(), this.loadStaffData()]);
+                        if (dlg.isConfirmed) {
+                            await this.openPaymentReceiptModal(paidId);
+                        }
+                    } else if (result.data.payment_status === 'expired' || result.data.payment_status === 'rejected') {
+                        this.stopPaymentPolling();
+                        const rejected = result.data.payment_status === 'rejected';
+                        this.pendingPayment = null;
+                        await Promise.all([this.loadInitialProfile(), this.loadClientPortalData()]);
+                        Swal.fire({
+                            icon: 'warning',
+                            title: rejected ? 'Pembayaran Dibatalkan / Ditolak' : 'Invoice Kedaluwarsa',
+                            text: 'Silakan buat pengajuan pembayaran baru jika ingin mengaktifkan paket langganan.',
+                            confirmButtonColor: '#0D7A5F',
+                        });
+                    } else if (showPendingAlert) {
+                        Swal.fire({
+                            icon: 'info',
+                            title: 'Menunggu Verifikasi',
+                            text: 'Tagihan masih menunggu konfirmasi Admin atau penyelesaian pembayaran.',
+                            confirmButtonColor: '#0D7A5F',
+                        });
                     }
-                } else if (result.data.payment_status === 'expired') {
-                    this.stopPaymentPolling();
-                    this.pendingPayment = null;
-                    await this.loadClientPortalData();
-                } else if (showPendingAlert) {
-                    Swal.fire({
-                        icon: 'info',
-                        title: 'Menunggu Verifikasi',
-                        text: 'Tagihan masih menunggu konfirmasi Admin atau penyelesaian pembayaran.',
-                        confirmButtonColor: '#0D7A5F',
-                    });
+                }
+            } catch (_) {
+                if (showPendingAlert) {
+                    Swal.fire({ icon: 'error', title: 'Gagal Memeriksa Status', text: 'Koneksi ke server terputus. Coba sesaat lagi.', confirmButtonColor: '#0D7A5F' });
                 }
             }
         },
@@ -5276,12 +5456,23 @@ function dashboardApp() {
             }
         },
         async submitClientUat(tcId, status) {
-            const res = await this.authFetch(`/api/client/uat/${tcId}`, {
-                method: 'POST',
-                body: JSON.stringify({ status }),
-            });
-            if (res.ok) {
-                await this.loadClientPortalData();
+            if (this.isSaving) return;
+            this.isSaving = true;
+            try {
+                const res = await this.authFetch(`/api/client/uat/${tcId}`, {
+                    method: 'POST',
+                    body: JSON.stringify({ status }),
+                });
+                const result = await res.json().catch(() => ({}));
+                if (res.ok) {
+                    await this.loadClientPortalData();
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Gagal Mengirim UAT', text: result.message || 'Status pengujian UAT gagal disimpan.', confirmButtonColor: '#0D7A5F' });
+                }
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'Gagal Mengirim UAT', text: e.message || 'Koneksi ke server terputus.', confirmButtonColor: '#0D7A5F' });
+            } finally {
+                this.isSaving = false;
             }
         },
         formatConsultStatus(st) {
@@ -5326,13 +5517,23 @@ function dashboardApp() {
             const oid = this.previewModalOutletId ? `&outlet_id=${encodeURIComponent(this.previewModalOutletId)}` : '';
             return `/pos?preview=1&embed=1${oid}&v=${this.previewModalVersion}`;
         },
+        previewIframeTimer: null,
+        startPosPreviewLoad() {
+            this.previewIframeLoading = true;
+            if (this.previewIframeTimer) clearTimeout(this.previewIframeTimer);
+            this.previewIframeTimer = setTimeout(() => { this.previewIframeLoading = false; }, 8000);
+        },
+        finishPosPreviewLoad() {
+            if (this.previewIframeTimer) { clearTimeout(this.previewIframeTimer); this.previewIframeTimer = null; }
+            this.previewIframeLoading = false;
+        },
         openPosPreviewModal(outletId = null) {
             if (!this.user || this.user.role !== 'owner') return;
             this.mobileMenuOpen = false;
             const list = this.outlets || [];
             const fallbackId = this.selectedOutletId || (list[0] ? list[0].id : '');
             this.previewModalOutletId = outletId ? String(outletId) : String(fallbackId || '');
-            this.previewIframeLoading = true;
+            this.startPosPreviewLoad();
             this.previewModalVersion += 1;
             this.openDropdown = null;
             this.showPosPreviewModal = true;
@@ -5341,14 +5542,15 @@ function dashboardApp() {
         selectPosPreviewOutlet(outletId) {
             this.previewModalOutletId = String(outletId || '');
             this.openDropdown = null;
-            this.previewIframeLoading = true;
+            this.startPosPreviewLoad();
             this.previewModalVersion += 1;
         },
         reloadPosPreview() {
-            this.previewIframeLoading = true;
+            this.startPosPreviewLoad();
             this.previewModalVersion += 1;
         },
         closePosPreviewModal() {
+            if (this.previewIframeTimer) { clearTimeout(this.previewIframeTimer); this.previewIframeTimer = null; }
             this.showPosPreviewModal = false;
             this.previewIframeLoading = false;
             if (this.openDropdown === 'previewOutlet') this.openDropdown = null;

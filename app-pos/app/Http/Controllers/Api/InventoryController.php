@@ -22,6 +22,12 @@ class InventoryController extends Controller
         if (!$user->canManageOperations()) {
             return response()->json(['status' => 'error', 'message' => 'Pemantauan stok hanya dapat diakses oleh Owner atau Admin Toko.'], 403);
         }
+        if ($user->role === 'admin' && $user->business) {
+            $settings = $user->business->resolvedFeatureSettings();
+            if (empty($settings['admin_manage_inventory'])) {
+                return response()->json(['status' => 'error', 'message' => 'Pemilik bisnis menonaktifkan akses pemantauan stok untuk Admin.'], 403);
+            }
+        }
         $outletId = $request->query('outlet_id', $user->outlet_id);
         if ($outletId) {
             Outlet::where('business_id', $user->business_id)->findOrFail($outletId);
@@ -31,13 +37,16 @@ class InventoryController extends Controller
             ->where('is_active', true)
             ->with(['category', 'unit'])
             ->get()
-            ->map(function ($product) use ($outletId) {
+            ->map(function ($product) use ($outletId, $user) {
                 $inv = Inventory::where('outlet_id', $outletId)
                     ->where('product_id', $product->id)
                     ->first();
                 $stock = $inv ? $inv->stock_quantity : 0;
                 $product->current_stock = $stock;
                 $product->is_low_stock = $stock <= $product->min_stock_alert;
+                if ($user->role !== 'owner') {
+                    $product->makeHidden('buy_price');
+                }
                 return $product;
             });
 
@@ -74,31 +83,44 @@ class InventoryController extends Controller
             'reason' => 'required|string|min:3',
         ]);
 
-        Outlet::where('business_id', $user->business_id)->findOrFail($validated['outlet_id']);
-        Product::where('business_id', $user->business_id)->findOrFail($validated['product_id']);
+        $outlet = Outlet::where('business_id', $user->business_id)->findOrFail($validated['outlet_id']);
+        if (!$outlet->is_active) {
+            return response()->json(['status' => 'error', 'message' => 'Outlet tujuan sedang dinonaktifkan.'], 422);
+        }
+        Product::where('business_id', $user->business_id)->where('is_active', true)->findOrFail($validated['product_id']);
 
         return DB::transaction(function () use ($user, $validated, $request) {
-            $inventory = Inventory::firstOrCreate(
-                [
-                    'outlet_id' => $validated['outlet_id'],
-                    'product_id' => $validated['product_id'],
-                ],
-                [
-                    'business_id' => $user->business_id,
-                    'stock_quantity' => 0,
-                ]
-            );
+            $inventory = Inventory::where('outlet_id', $validated['outlet_id'])
+                ->where('product_id', $validated['product_id'])
+                ->lockForUpdate()
+                ->first();
+
+            if (!$inventory) {
+                try {
+                    Inventory::create([
+                        'business_id' => $user->business_id,
+                        'outlet_id' => $validated['outlet_id'],
+                        'product_id' => $validated['product_id'],
+                        'stock_quantity' => 0,
+                    ]);
+                } catch (\Illuminate\Database\QueryException $e) {
+                    // Concurrent worker created row first; fall through to lock
+                }
+                $inventory = Inventory::where('outlet_id', $validated['outlet_id'])
+                    ->where('product_id', $validated['product_id'])
+                    ->lockForUpdate()
+                    ->firstOrFail();
+            }
 
             $before = $inventory->stock_quantity;
             $qty = $validated['quantity'];
 
             if ($validated['type'] === 'adjustment_add') {
                 $after = $before + $qty;
-                $change = $qty;
             } else {
                 $after = max(0, $before - $qty);
-                $change = -$qty;
             }
+            $change = $after - $before;
 
             $inventory->update(['stock_quantity' => $after]);
 
@@ -166,16 +188,47 @@ class InventoryController extends Controller
             'reason' => 'nullable|string',
         ]);
 
-        Outlet::where('business_id', $user->business_id)->findOrFail($validated['from_outlet_id']);
-        Outlet::where('business_id', $user->business_id)->findOrFail($validated['to_outlet_id']);
-        Product::where('business_id', $user->business_id)->findOrFail($validated['product_id']);
+        $fromOutlet = Outlet::where('business_id', $user->business_id)->findOrFail($validated['from_outlet_id']);
+        $toOutlet = Outlet::where('business_id', $user->business_id)->findOrFail($validated['to_outlet_id']);
+        if (!$fromOutlet->is_active || !$toOutlet->is_active) {
+            return response()->json(['status' => 'error', 'message' => 'Outlet asal atau tujuan sedang dinonaktifkan.'], 422);
+        }
+        Product::where('business_id', $user->business_id)->where('is_active', true)->findOrFail($validated['product_id']);
 
         return DB::transaction(function () use ($user, $validated, $request) {
-            $fromInv = Inventory::where('outlet_id', $validated['from_outlet_id'])
-                ->where('product_id', $validated['product_id'])
-                ->lockForUpdate()
-                ->first();
+            $fromOutletId = (int) $validated['from_outlet_id'];
+            $toOutletId = (int) $validated['to_outlet_id'];
+            $productId = (int) $validated['product_id'];
 
+            // Lock destination and source inventory rows in deterministic outlet ID order to prevent deadlocks
+            $orderedOutlets = [$fromOutletId, $toOutletId];
+            sort($orderedOutlets);
+            $lockedRows = [];
+            foreach ($orderedOutlets as $oid) {
+                $row = Inventory::where('outlet_id', $oid)
+                    ->where('product_id', $productId)
+                    ->lockForUpdate()
+                    ->first();
+                if (!$row && $oid === $toOutletId) {
+                    try {
+                        Inventory::create([
+                            'business_id' => $user->business_id,
+                            'outlet_id' => $toOutletId,
+                            'product_id' => $productId,
+                            'stock_quantity' => 0,
+                        ]);
+                    } catch (\Illuminate\Database\QueryException $e) {
+                        // Concurrent worker inserted first
+                    }
+                    $row = Inventory::where('outlet_id', $toOutletId)
+                        ->where('product_id', $productId)
+                        ->lockForUpdate()
+                        ->firstOrFail();
+                }
+                $lockedRows[$oid] = $row;
+            }
+
+            $fromInv = $lockedRows[$fromOutletId] ?? null;
             $qty = $validated['quantity'];
 
             if (!$fromInv || $fromInv->stock_quantity < $qty) {
@@ -192,28 +245,18 @@ class InventoryController extends Controller
 
             StockMovement::create([
                 'business_id' => $user->business_id,
-                'outlet_id' => $validated['from_outlet_id'],
-                'product_id' => $validated['product_id'],
+                'outlet_id' => $fromOutletId,
+                'product_id' => $productId,
                 'type' => 'transfer_out',
                 'quantity_before' => $beforeFrom,
                 'quantity_change' => -$qty,
                 'quantity_after' => $afterFrom,
-                'reason' => 'Transfer keluar ke outlet #' . $validated['to_outlet_id'],
+                'reason' => 'Transfer keluar ke outlet #' . $toOutletId,
                 'user_id' => $user->id,
             ]);
 
-            // Add Destination
-            $toInv = Inventory::firstOrCreate(
-                [
-                    'outlet_id' => $validated['to_outlet_id'],
-                    'product_id' => $validated['product_id'],
-                ],
-                [
-                    'business_id' => $user->business_id,
-                    'stock_quantity' => 0,
-                ]
-            );
-
+            // Add Destination (already locked inside transaction)
+            $toInv = $lockedRows[$toOutletId];
             $beforeTo = $toInv->stock_quantity;
             $afterTo = $beforeTo + $qty;
             $toInv->update(['stock_quantity' => $afterTo]);
@@ -261,6 +304,12 @@ class InventoryController extends Controller
         if (!$user->canManageOperations()) {
             return response()->json(['status' => 'error', 'message' => 'Riwayat mutasi stok hanya dapat diakses oleh Owner atau Admin Toko.'], 403);
         }
+        if ($user->role === 'admin' && $user->business) {
+            $settings = $user->business->resolvedFeatureSettings();
+            if (empty($settings['admin_manage_inventory'])) {
+                return response()->json(['status' => 'error', 'message' => 'Pemilik bisnis menonaktifkan akses riwayat mutasi stok untuk Admin.'], 403);
+            }
+        }
         $outletId = $request->query('outlet_id');
         if ($outletId) {
             Outlet::where('business_id', $user->business_id)->findOrFail($outletId);
@@ -281,6 +330,13 @@ class InventoryController extends Controller
         }
 
         $movements = $query->paginate(200);
+        if ($user->role !== 'owner') {
+            $movements->getCollection()->each(function ($mv) {
+                if ($mv->product) {
+                    $mv->product->makeHidden('buy_price');
+                }
+            });
+        }
 
         return response()->json([
             'status' => 'success',

@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ShiftController;
 use App\Http\Controllers\Api\StaffController;
+use App\Http\Middleware\EnsureActiveSubscription;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -37,61 +38,64 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    // Outlets & Staff Management (Owner exclusive for mutations)
-    Route::get('/outlets', [OutletController::class, 'index']);
-    Route::post('/outlets', [OutletController::class, 'store']);
-    Route::put('/outlets/{id}', [OutletController::class, 'update']);
+    // Operational Store, Staff, Inventory, Shift, POS & Reports (Subscription-Gated)
+    Route::middleware(EnsureActiveSubscription::class)->group(function () {
+        // Outlets & Staff Management (Owner exclusive for mutations)
+        Route::get('/outlets', [OutletController::class, 'index']);
+        Route::post('/outlets', [OutletController::class, 'store']);
+        Route::put('/outlets/{id}', [OutletController::class, 'update']);
 
-    Route::get('/staff', [StaffController::class, 'index']);
-    Route::post('/staff', [StaffController::class, 'store']);
-    Route::put('/staff/{id}', [StaffController::class, 'update']);
-    Route::delete('/staff/{id}', [StaffController::class, 'destroy']);
-    Route::put('/business/profile', [StaffController::class, 'updateBusinessProfile']);
-    Route::put('/business/settings', [StaffController::class, 'updateFeatureSettings']);
+        Route::get('/staff', [StaffController::class, 'index']);
+        Route::post('/staff', [StaffController::class, 'store']);
+        Route::put('/staff/{id}', [StaffController::class, 'update']);
+        Route::delete('/staff/{id}', [StaffController::class, 'destroy']);
+        Route::put('/business/profile', [StaffController::class, 'updateBusinessProfile']);
+        Route::put('/business/settings', [StaffController::class, 'updateFeatureSettings']);
 
-    // Categories (FR-013)
-    Route::get('/categories', [CategoryController::class, 'index']);
-    Route::post('/categories', [CategoryController::class, 'store']);
-    Route::put('/categories/{id}', [CategoryController::class, 'update']);
-    Route::delete('/categories/{id}', [CategoryController::class, 'destroy']);
+        // Categories (FR-013)
+        Route::get('/categories', [CategoryController::class, 'index']);
+        Route::post('/categories', [CategoryController::class, 'store']);
+        Route::put('/categories/{id}', [CategoryController::class, 'update']);
+        Route::delete('/categories/{id}', [CategoryController::class, 'destroy']);
 
-    // Products (FR-009 s/d FR-015)
-    Route::get('/products', [ProductController::class, 'index']);
-    Route::post('/products', [ProductController::class, 'store']);
-    Route::post('/products/{id}', [ProductController::class, 'update']);
-    Route::put('/products/{id}', [ProductController::class, 'update']);
-    Route::delete('/products/{id}', [ProductController::class, 'destroy']);
-    Route::get('/products/barcode/{barcode}', [ProductController::class, 'findByBarcode']);
+        // Products (FR-009 s/d FR-015)
+        Route::get('/products', [ProductController::class, 'index']);
+        Route::post('/products', [ProductController::class, 'store']);
+        Route::post('/products/{id}', [ProductController::class, 'update']);
+        Route::put('/products/{id}', [ProductController::class, 'update']);
+        Route::delete('/products/{id}', [ProductController::class, 'destroy']);
+        Route::get('/products/barcode/{barcode}', [ProductController::class, 'findByBarcode']);
 
-    // Inventory & Stock Management (FR-016 s/d FR-020)
-    Route::get('/inventory', [InventoryController::class, 'index']);
-    Route::post('/inventory/adjust', [InventoryController::class, 'adjustStock']);
-    Route::post('/inventory/transfer', [InventoryController::class, 'transferStock']);
-    Route::get('/inventory/movements', [InventoryController::class, 'movements']);
+        // Inventory & Stock Management (FR-016 s/d FR-020)
+        Route::get('/inventory', [InventoryController::class, 'index']);
+        Route::post('/inventory/adjust', [InventoryController::class, 'adjustStock']);
+        Route::post('/inventory/transfer', [InventoryController::class, 'transferStock']);
+        Route::get('/inventory/movements', [InventoryController::class, 'movements']);
 
-    // Cashier Shift Management (FR-035 s/d FR-037)
-    Route::get('/shifts/current', [ShiftController::class, 'current']);
-    Route::post('/shifts/open', [ShiftController::class, 'open']);
-    Route::post('/shifts/{id}/close', [ShiftController::class, 'close']);
-    Route::get('/shifts/history', [ShiftController::class, 'history']);
+        // Cashier Shift Management (FR-035 s/d FR-037)
+        Route::get('/shifts/current', [ShiftController::class, 'current']);
+        Route::post('/shifts/open', [ShiftController::class, 'open']);
+        Route::post('/shifts/{id}/close', [ShiftController::class, 'close']);
+        Route::get('/shifts/history', [ShiftController::class, 'history']);
 
-    // POS & Cashier Transactions (FR-021 s/d FR-034)
-    Route::post('/pos/checkout', [PosController::class, 'checkout']);
-    Route::post('/pos/hold', [PosController::class, 'holdTransaction']);
-    Route::get('/pos/held', [PosController::class, 'listHeld']);
-    Route::delete('/pos/held/{id}/resume', [PosController::class, 'resumeHeld']);
-    Route::get('/pos/history', [PosController::class, 'history']);
-    Route::get('/pos/transactions/{id}', [PosController::class, 'detail']);
-    Route::post('/pos/transactions/{id}/void', [PosController::class, 'voidTransaction']);
+        // POS & Cashier Transactions (FR-021 s/d FR-034)
+        Route::post('/pos/checkout', [PosController::class, 'checkout']);
+        Route::post('/pos/hold', [PosController::class, 'holdTransaction']);
+        Route::get('/pos/held', [PosController::class, 'listHeld']);
+        Route::delete('/pos/held/{id}/resume', [PosController::class, 'resumeHeld']);
+        Route::get('/pos/history', [PosController::class, 'history']);
+        Route::get('/pos/transactions/{id}', [PosController::class, 'detail']);
+        Route::post('/pos/transactions/{id}/void', [PosController::class, 'voidTransaction']);
 
-    // Customers (FR-038 s/d FR-040)
-    Route::get('/customers', [CustomerController::class, 'index']);
-    Route::post('/customers', [CustomerController::class, 'store']);
+        // Customers (FR-038 s/d FR-040)
+        Route::get('/customers', [CustomerController::class, 'index']);
+        Route::post('/customers', [CustomerController::class, 'store']);
 
-    // Reports & Dashboard (FR-045 s/d FR-050)
-    Route::get('/reports/dashboard', [ReportController::class, 'dashboard']);
-    Route::get('/reports/sales', [ReportController::class, 'salesReport']);
-    Route::get('/reports/profit', [ReportController::class, 'profitReport']);
+        // Reports & Dashboard (FR-045 s/d FR-050)
+        Route::get('/reports/dashboard', [ReportController::class, 'dashboard']);
+        Route::get('/reports/sales', [ReportController::class, 'salesReport']);
+        Route::get('/reports/profit', [ReportController::class, 'profitReport']);
+    });
 
     // Client Account Portal (Wajib Login/Register untuk Sewa Layanan atau Konsultasi Custom)
     Route::prefix('client')->group(function () {

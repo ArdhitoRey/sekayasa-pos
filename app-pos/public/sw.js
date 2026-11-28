@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tandha-kasir-v6';
+const CACHE_NAME = 'tandha-kasir-v7';
 const urlsToCache = [
   '/pos?app=kasir',
   '/manifest.json?v=5',
@@ -27,9 +27,14 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   const reqUrl = new URL(event.request.url);
-  if (reqUrl.origin === self.location.origin && (reqUrl.pathname === '/pos' || reqUrl.pathname === '/manifest.json')) {
+  if (reqUrl.origin === self.location.origin && (
+    reqUrl.pathname === '/pos' ||
+    reqUrl.pathname === '/manifest.json' ||
+    reqUrl.pathname.endsWith('.png') ||
+    reqUrl.pathname.endsWith('.svg')
+  )) {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match(event.request))
+      fetch(event.request).catch(() => caches.match(event.request, { ignoreSearch: true }))
     );
   }
 });

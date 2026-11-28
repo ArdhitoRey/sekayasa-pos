@@ -13,6 +13,7 @@ use App\Models\UatTestCase;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
 class ClientAccountController extends Controller
@@ -119,7 +120,15 @@ class ClientAccountController extends Controller
      */
     public function overview(Request $request)
     {
-        $user = $request->user()->load('business.outlets', 'business.currentSubscription.plan', 'outlet');
+        $user = $request->user();
+        if (!$user->canManageBusiness()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Hanya Pemilik Bisnis (Owner) yang dapat mengakses portal langganan dan konsultasi bisnis.',
+            ], 403);
+        }
+
+        $user->load('business.outlets', 'business.currentSubscription.plan', 'outlet');
         $plans = Plan::where('is_active', true)->orderBy('price_monthly')->get();
 
         $pendingPayment = null;
@@ -226,12 +235,27 @@ class ClientAccountController extends Controller
         }
 
         $plan = Plan::where('is_active', true)->findOrFail($validated['plan_id']);
-        $business = $user->business;
+        $business = $user->business()->with('currentSubscription.plan')->firstOrFail();
+
+        $activeSub = $business->currentSubscription;
+        if (
+            $activeSub
+            && $activeSub->isActive()
+            && $activeSub->status === 'active'
+            && $activeSub->plan
+            && (float) $plan->price_monthly < (float) $activeSub->plan->price_monthly
+        ) {
+            return response()->json([
+                'status' => 'error',
+                'message' => "Paket {$activeSub->plan->name} Anda masih aktif. Penurunan paket (downgrade) hanya dapat dilakukan setelah masa aktif berakhir.",
+            ], 422);
+        }
+
         $periods = SubscriptionPayment::billingPeriods();
         $months = (int) ($validated['duration_months'] ?? 1);
         $period = $periods[$months] ?? $periods[1];
 
-        return DB::transaction(function () use ($business, $plan, $period) {
+        $payment = DB::transaction(function () use ($business, $plan, $period) {
             Business::whereKey($business->id)->lockForUpdate()->firstOrFail();
 
             SubscriptionPayment::where('business_id', $business->id)
@@ -267,14 +291,60 @@ class ClientAccountController extends Controller
                 request()->ip()
             );
 
-            return response()->json([
-                'status' => 'success',
-                'message' => "Tagihan langganan {$invoiceNumber} ({$period['label']}) sebesar Rp " . number_format($amount, 0, ',', '.') . " berhasil dibuat.",
-                'data' => [
-                    'payment' => $payment->load('plan'),
-                ],
-            ], 201);
+            return $payment;
         });
+
+        // Request Snap token automatically when Midtrans Server Key is configured
+        $snapToken = null;
+        $snapRedirectUrl = null;
+        $midtransKey = (string) config('services.midtrans.server_key', '');
+        if ($midtransKey !== '' && !app()->runningUnitTests()) {
+            try {
+                $snapBase = config('services.midtrans.is_production')
+                    ? 'https://app.midtrans.com/snap/v1/transactions'
+                    : 'https://app.sandbox.midtrans.com/snap/v1/transactions';
+                $snapRes = Http::withBasicAuth($midtransKey, '')
+                    ->acceptJson()
+                    ->timeout(6)
+                    ->post($snapBase, [
+                        'transaction_details' => [
+                            'order_id' => $payment->invoice_number,
+                            'gross_amount' => (int) round((float) $payment->amount),
+                        ],
+                        'item_details' => [[
+                            'id' => 'PLAN-' . $plan->id,
+                            'price' => (int) round((float) $payment->amount),
+                            'quantity' => 1,
+                            'name' => mb_substr("Tandha {$plan->name} ({$period['label']})", 0, 50),
+                        ]],
+                        'customer_details' => [
+                            'first_name' => $user->name,
+                            'email' => $user->email,
+                            'phone' => $user->phone ?: ($business->phone ?: ''),
+                        ],
+                    ]);
+                if ($snapRes->successful()) {
+                    $snapToken = $snapRes->json('token');
+                    $snapRedirectUrl = $snapRes->json('redirect_url');
+                    if ($snapRedirectUrl || $snapToken) {
+                        $payment->update([
+                            'qris_payload' => $snapRedirectUrl ?: $snapToken,
+                        ]);
+                    }
+                }
+            } catch (\Throwable $ignored) {
+            }
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => "Tagihan langganan {$payment->invoice_number} ({$period['label']}) sebesar Rp " . number_format((float) $payment->amount, 0, ',', '.') . " berhasil dibuat.",
+            'data' => [
+                'payment' => $payment->load('plan'),
+                'snap_token' => $snapToken,
+                'snap_redirect_url' => $snapRedirectUrl,
+            ],
+        ], 201);
     }
 
     /**
@@ -283,6 +353,9 @@ class ClientAccountController extends Controller
     public function checkPaymentStatus(Request $request, $paymentId)
     {
         $user = $request->user();
+        if (!$user->canManageBusiness()) {
+            return response()->json(['status' => 'error', 'message' => 'Hanya Pemilik Bisnis (Owner) yang dapat melihat status tagihan langganan.'], 403);
+        }
         $payment = SubscriptionPayment::with('plan', 'business.currentSubscription.plan', 'subscription')
             ->where('business_id', $user->business_id)
             ->findOrFail($paymentId);
@@ -374,6 +447,18 @@ class ClientAccountController extends Controller
         $fraudStatus = $request->input('fraud_status');
 
         if (in_array($txStatus, ['capture', 'settlement'], true) && ($fraudStatus === null || $fraudStatus === 'accept')) {
+            if ($payment->status === 'pending' && $payment->expires_at && $payment->expires_at->isPast()) {
+                $payment->update([
+                    'status' => 'rejected',
+                    'webhook_payload' => $request->all(),
+                    'notes' => ($payment->notes ? $payment->notes . ' | ' : '') . 'Tagihan sudah kedaluwarsa saat callback diterima',
+                ]);
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Tagihan langganan sudah kedaluwarsa dan tidak dapat diaktifkan.',
+                ], 422);
+            }
+
             try {
                 $method = 'midtrans_' . strtolower((string) $request->input('payment_type', 'gateway'));
                 $res = $payment->approveAndActivate(
@@ -601,6 +686,12 @@ class ClientAccountController extends Controller
     public function submitOwnUat(Request $request, $testCaseId)
     {
         $user = $request->user();
+        if (!$user->canManageBusiness()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Hanya Pemilik Bisnis (Owner) yang dapat mengirimkan hasil pengujian UAT proyek.',
+            ], 403);
+        }
         $validated = $request->validate([
             'status' => 'required|in:pass,fail,blocked',
             'client_feedback' => 'nullable|string',

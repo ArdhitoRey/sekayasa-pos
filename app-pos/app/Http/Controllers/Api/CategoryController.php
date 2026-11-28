@@ -29,6 +29,13 @@ class CategoryController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
+        if (!$user->business_id) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Akses kategori hanya tersedia untuk akun bisnis.',
+            ], 403);
+        }
+
         $categories = Category::where('business_id', $user->business_id)
             ->with(['products' => function ($q) {
                 $q->where('is_active', true)

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
+use App\Models\Business;
 use App\Models\Outlet;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -61,16 +62,6 @@ class StaffController extends Controller
     public function store(Request $request)
     {
         $owner = $this->ensureOwner($request);
-        $business = $owner->business()->with('currentSubscription.plan')->firstOrFail();
-        $limits = $business->planLimits();
-
-        $currentUsersCount = User::where('business_id', $business->id)->count();
-        if ($currentUsersCount >= $limits['max_users']) {
-            return response()->json([
-                'status' => 'error',
-                'message' => "Kuota pengguna paket {$limits['plan_name']} sudah penuh ({$currentUsersCount}/{$limits['max_users']} akun). Upgrade paket untuk menambah staf lagi.",
-            ], 403);
-        }
 
         $request->merge([
             'email' => strtolower(trim((string) $request->input('email', ''))),
@@ -89,36 +80,52 @@ class StaffController extends Controller
             'role.in' => 'Role staf hanya boleh admin atau cashier.',
         ]);
 
-        Outlet::where('business_id', $business->id)->findOrFail($validated['outlet_id']);
+        Outlet::where('business_id', $owner->business_id)->findOrFail($validated['outlet_id']);
 
-        $staff = User::create([
-            'business_id' => $business->id,
-            'outlet_id' => $validated['outlet_id'],
-            'name' => trim($validated['name']),
-            'email' => $validated['email'],
-            'phone' => !empty($validated['phone']) ? trim($validated['phone']) : null,
-            'job_title' => !empty($validated['job_title']) ? trim($validated['job_title']) : ($validated['role'] === 'admin' ? 'Admin Toko' : 'Kasir'),
-            'role' => $validated['role'],
-            'password' => Hash::make($validated['password']),
-            'email_verified_at' => now(),
-            'is_active' => true,
-        ]);
+        return DB::transaction(function () use ($owner, $validated, $request) {
+            $business = Business::with('currentSubscription.plan')
+                ->where('id', $owner->business_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $limits = $business->planLimits();
 
-        ActivityLog::record(
-            $business->id,
-            $owner->id,
-            'staff_created',
-            'User',
-            $staff->id,
-            ['name' => $staff->name, 'email' => $staff->email, 'role' => $staff->role, 'outlet_id' => $staff->outlet_id],
-            $request->ip()
-        );
+            $currentUsersCount = User::where('business_id', $business->id)->count();
+            if ($currentUsersCount >= $limits['max_users']) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => "Kuota pengguna paket {$limits['plan_name']} sudah penuh ({$currentUsersCount}/{$limits['max_users']} akun). Upgrade paket untuk menambah staf lagi.",
+                ], 403);
+            }
 
-        return response()->json([
-            'status' => 'success',
-            'message' => "Akun {$staff->role} ({$staff->name}) berhasil ditambahkan.",
-            'data' => $staff->load('outlet:id,name'),
-        ], 201);
+            $staff = User::create([
+                'business_id' => $business->id,
+                'outlet_id' => $validated['outlet_id'],
+                'name' => trim($validated['name']),
+                'email' => $validated['email'],
+                'phone' => !empty($validated['phone']) ? trim($validated['phone']) : null,
+                'job_title' => !empty($validated['job_title']) ? trim($validated['job_title']) : ($validated['role'] === 'admin' ? 'Admin Toko' : 'Kasir'),
+                'role' => $validated['role'],
+                'password' => Hash::make($validated['password']),
+                'email_verified_at' => now(),
+                'is_active' => true,
+            ]);
+
+            ActivityLog::record(
+                $business->id,
+                $owner->id,
+                'staff_created',
+                'User',
+                $staff->id,
+                ['name' => $staff->name, 'email' => $staff->email, 'role' => $staff->role, 'outlet_id' => $staff->outlet_id],
+                $request->ip()
+            );
+
+            return response()->json([
+                'status' => 'success',
+                'message' => "Akun {$staff->role} ({$staff->name}) berhasil ditambahkan.",
+                'data' => $staff->load('outlet:id,name'),
+            ], 201);
+        });
     }
 
     /**

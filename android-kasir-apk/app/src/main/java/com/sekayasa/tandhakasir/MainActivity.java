@@ -2,6 +2,7 @@ package com.sekayasa.tandhakasir;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.DownloadManager;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
@@ -23,6 +24,7 @@ import android.view.ViewGroup;
 import android.webkit.CookieManager;
 import android.webkit.DownloadListener;
 import android.webkit.JavascriptInterface;
+import android.webkit.PermissionRequest;
 import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -152,7 +154,9 @@ public class MainActivity extends Activity {
             retryBtn.setOnClickListener(v -> {
                 offlineOverlay.setVisibility(View.GONE);
                 loadingOverlay.setVisibility(View.VISIBLE);
-                webView.loadUrl(BuildConfig.KASIR_URL);
+                String current = webView != null ? webView.getUrl() : null;
+                boolean isSameHost = current != null && !baseHost.isEmpty() && current.startsWith("https://" + baseHost);
+                webView.loadUrl(isSameHost ? current : BuildConfig.KASIR_URL);
             });
             container.addView(retryBtn, btnLp);
         }
@@ -185,6 +189,7 @@ public class MainActivity extends Activity {
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
                 super.onPageStarted(view, url, favicon);
+                pageLoadedSuccessfully = false;
                 offlineOverlay.setVisibility(View.GONE);
             }
 
@@ -204,13 +209,9 @@ public class MainActivity extends Activity {
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
                 String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase();
-                if ("http".equals(scheme) || "https".equals(scheme)) {
-                    String host = uri.getHost() == null ? "" : uri.getHost();
-                    if (!baseHost.isEmpty() && host.equalsIgnoreCase(baseHost)) {
-                        return false;
-                    }
-                    openExternalUri(uri);
-                    return true;
+                String host = uri.getHost() == null ? "" : uri.getHost();
+                if ("https".equals(scheme) && !baseHost.isEmpty() && host.equalsIgnoreCase(baseHost)) {
+                    return false;
                 }
                 openExternalUri(uri);
                 return true;
@@ -232,6 +233,18 @@ public class MainActivity extends Activity {
                 super.onProgressChanged(view, newProgress);
                 if (newProgress >= 85) {
                     loadingOverlay.setVisibility(View.GONE);
+                }
+            }
+
+            @Override
+            public void onPermissionRequest(final PermissionRequest request) {
+                Uri origin = request.getOrigin();
+                String host = origin != null && origin.getHost() != null ? origin.getHost() : "";
+                String scheme = origin != null && origin.getScheme() != null ? origin.getScheme() : "";
+                if ("https".equalsIgnoreCase(scheme) && !baseHost.isEmpty() && host.equalsIgnoreCase(baseHost)) {
+                    runOnUiThread(() -> request.grant(request.getResources()));
+                } else {
+                    runOnUiThread(request::deny);
                 }
             }
 
@@ -295,11 +308,26 @@ public class MainActivity extends Activity {
     }
 
     private void handleBackNavigation() {
-        if (webView != null && webView.canGoBack()) {
-            webView.goBack();
-        } else {
-            finish();
+        if (webView != null) {
+            String currentUrl = webView.getUrl();
+            if (currentUrl != null) {
+                String path = Uri.parse(currentUrl).getPath();
+                if (path != null && (path.equals("/pos") || path.startsWith("/pos/"))) {
+                    new AlertDialog.Builder(this)
+                            .setTitle("Keluar Aplikasi Kasir?")
+                            .setMessage("Sesi kasir tetap tersimpan. Keluar dari Tandha POS Kasir sekarang?")
+                            .setPositiveButton("Keluar", (d, w) -> finish())
+                            .setNegativeButton("Tetap di Kasir", null)
+                            .show();
+                    return;
+                }
+            }
+            if (webView.canGoBack()) {
+                webView.goBack();
+                return;
+            }
         }
+        finish();
     }
 
     @SuppressWarnings("deprecation")

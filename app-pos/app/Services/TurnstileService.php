@@ -358,7 +358,7 @@ class TurnstileService
      *
      * @throws ValidationException
      */
-    public function verifyOrFail(?string $token, ?string $remoteIp = null, ?string $userAgent = null, ?string $honeypot = null): void
+    public function verifyOrFail(?string $token, ?string $remoteIp = null, ?string $userAgent = null, ?string $honeypot = null, ?string $expectedContext = null): void
     {
         if (filled($honeypot)) {
             throw ValidationException::withMessages([
@@ -383,6 +383,7 @@ class TurnstileService
                 !$record
                 || ($record['ip'] ?? null) !== $remoteIp
                 || ($record['ua'] ?? null) !== hash('sha256', (string) $userAgent)
+                || ($expectedContext !== null && ($record['context'] ?? 'login') !== $expectedContext)
             ) {
                 throw ValidationException::withMessages([
                     'cf_turnstile_response' => ['Verifikasi Tandha Shield tidak valid atau sudah kedaluwarsa. Silakan ulangi geser verifikasi.'],

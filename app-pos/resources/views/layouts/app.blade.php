@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Tandha by SEKA GROUP — Aplikasi Kasir & Kontrol Cabang')</title>
-    <link rel="icon" type="image/svg+xml" href="/assets/Logo%20Tandha.svg?v=5">
     <link rel="icon" type="image/png" sizes="192x192" href="/tandha-icon-192.png?v=5">
+    <link rel="icon" type="image/svg+xml" href="/assets/Logo%20Tandha.svg?v=5">
     <link rel="shortcut icon" href="/favicon.ico?v=5">
 
     <!-- PWA WebAPK Meta Tags -->
@@ -120,20 +120,46 @@
         }
 
         @media print {
+            html, body {
+                height: auto !important;
+                overflow: visible !important;
+                background: #ffffff !important;
+            }
             body * { visibility: hidden; }
             #printable-receipt, #printable-receipt *,
             #printable-sub-receipt, #printable-sub-receipt * { visibility: visible; }
+            .tandha-print-overlay {
+                position: static !important;
+                inset: auto !important;
+                padding: 0 !important;
+                background: transparent !important;
+                display: block !important;
+                height: auto !important;
+                overflow: visible !important;
+            }
+            .tandha-print-overlay .tandha-modal-card,
+            .tandha-print-scroll-reset {
+                max-height: none !important;
+                max-width: none !important;
+                height: auto !important;
+                overflow: visible !important;
+                border: none !important;
+                box-shadow: none !important;
+                background: #ffffff !important;
+                padding: 0 !important;
+            }
             #printable-receipt {
                 position: absolute;
                 left: 0;
                 top: 0;
                 width: 80mm;
                 margin: 0;
-                padding: 10px;
+                padding: 8px;
+                border: none !important;
                 font-family: 'Courier New', Courier, monospace;
             }
             #printable-sub-receipt {
-                position: fixed;
+                position: absolute;
                 left: 0;
                 top: 0;
                 width: 100%;

@@ -54,6 +54,7 @@ jobs:
             echo "KEY_ALIAS=${ANDROID_KEY_ALIAS:-tandha}" >> "$GITHUB_ENV"
             echo "KEY_PASSWORD=${ANDROID_KEY_PASSWORD:-tandha2026}" >> "$GITHUB_ENV"
           else
+            echo "::warning::ANDROID_KEYSTORE_BASE64 belum diset di GitHub Secrets. Keystore sementara membuat update APK di-place di HP Android gagal hingga app lama di-uninstall."
             keytool -genkeypair -v \
               -keystore "$RUNNER_TEMP/release.keystore" \
               -storetype PKCS12 \
@@ -83,6 +84,8 @@ jobs:
           echo "Building Tandha Kasir APK for URL: $TARGET_URL"
           gradle assembleRelease --no-daemon \
             -PKASIR_URL="$TARGET_URL" \
+            -PVERSION_CODE="${{ github.run_number }}" \
+            -PVERSION_NAME="1.0.${{ github.run_number }}" \
             -PKEYSTORE_FILE="$RUNNER_TEMP/release.keystore" \
             -PKEYSTORE_PASSWORD="$KEYSTORE_PASSWORD" \
             -PKEY_ALIAS="$KEY_ALIAS" \

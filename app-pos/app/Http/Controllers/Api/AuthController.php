@@ -107,6 +107,12 @@ class AuthController extends Controller
      */
     public function sendRegistrationVerification(Request $request)
     {
+        if ($request->filled('company_website')) {
+            throw ValidationException::withMessages([
+                'email' => ['Permintaan verifikasi ditolak.'],
+            ]);
+        }
+
         $request->merge([
             'email' => strtolower(trim((string) $request->input('email', ''))),
         ]);
@@ -119,6 +125,7 @@ class AuthController extends Controller
         ]);
 
         $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        Cache::forget('email_verify_attempts:' . $validated['email']);
         Cache::put('email_verify:' . $validated['email'], Hash::make($code), now()->addMinutes(15));
 
         if ($mailError = $this->sendOtpMailSafely(
@@ -163,7 +170,8 @@ class AuthController extends Controller
             $request->input('cf_turnstile_response'),
             $request->ip(),
             $request->userAgent(),
-            $request->input('company_website')
+            $request->input('company_website'),
+            'register'
         );
 
         $normalizedEmail = strtolower(trim((string) $request->input('email', '')));
@@ -359,7 +367,8 @@ class AuthController extends Controller
             $request->input('cf_turnstile_response'),
             $request->ip(),
             $request->userAgent(),
-            $request->input('company_website')
+            $request->input('company_website'),
+            'login'
         );
 
         $request->merge([
@@ -551,6 +560,12 @@ class AuthController extends Controller
      */
     public function forgotPassword(Request $request)
     {
+        if ($request->filled('company_website')) {
+            throw ValidationException::withMessages([
+                'email' => ['Permintaan reset ditolak.'],
+            ]);
+        }
+
         $request->merge([
             'email' => strtolower(trim((string) $request->input('email', ''))),
         ]);
@@ -562,6 +577,7 @@ class AuthController extends Controller
         $user = User::where('email', $validated['email'])->first();
         if ($user && $user->is_active) {
             $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+            Cache::forget('password_reset_attempts:' . $user->email);
             DB::table('password_reset_tokens')->updateOrInsert(
                 ['email' => $user->email],
                 ['token' => Hash::make($code), 'created_at' => now()]
@@ -629,6 +645,13 @@ class AuthController extends Controller
         Cache::forget($attemptsKey);
 
         $user = User::where('email', $validated['email'])->firstOrFail();
+        if (!$user->is_active || ($user->business && !$user->business->is_active)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Akun atau bisnis sedang dinonaktifkan sehingga kata sandi tidak dapat diubah.',
+            ], 403);
+        }
+
         $user->update([
             'password' => Hash::make($validated['password']),
             'email_verified_at' => $user->email_verified_at ?? now(),
@@ -665,8 +688,14 @@ class AuthController extends Controller
             return redirect('/login?google_error=not_configured');
         }
 
+        $rawRedirect = trim((string) $request->query('redirect', ''));
+        $safeRedirect = '';
+        if ($rawRedirect !== '' && str_starts_with($rawRedirect, '/') && !str_starts_with($rawRedirect, '//') && !str_contains($rawRedirect, '\\') && !preg_match('/[\x00-\x1f]/', $rawRedirect)) {
+            $safeRedirect = $rawRedirect;
+        }
+
         $state = Str::random(40);
-        Cache::put('google_oauth_state:' . $state, true, now()->addMinutes(10));
+        Cache::put('google_oauth_state:' . $state, ['redirect' => $safeRedirect], now()->addMinutes(10));
 
         $redirectUri = url(config('services.google.redirect', '/auth/google/callback'));
         $query = http_build_query([
@@ -693,9 +722,12 @@ class AuthController extends Controller
         $state = (string) $request->query('state', '');
         $code = (string) $request->query('code', '');
 
-        if ($state === '' || !Cache::pull('google_oauth_state:' . $state) || $code === '') {
+        $stateData = $state !== '' ? Cache::pull('google_oauth_state:' . $state) : null;
+        if (!$stateData || $code === '') {
             return redirect('/login?google_error=invalid_state');
         }
+        $redirectTarget = is_array($stateData) ? trim((string) ($stateData['redirect'] ?? '')) : '';
+        $redirectSuffix = $redirectTarget !== '' ? ('&redirect=' . urlencode($redirectTarget)) : '';
 
         $redirectUri = url(config('services.google.redirect', '/auth/google/callback'));
         $tokenRes = Http::asForm()->post('https://oauth2.googleapis.com/token', [
@@ -715,6 +747,10 @@ class AuthController extends Controller
 
         if (!$profileRes->ok() || empty($profileRes->json('email'))) {
             return redirect('/login?google_error=profile_failed');
+        }
+
+        if (filter_var($profileRes->json('email_verified'), FILTER_VALIDATE_BOOLEAN) !== true) {
+            return redirect('/login?google_error=unverified_email');
         }
 
         $googleEmail = strtolower(trim((string) $profileRes->json('email')));
@@ -761,7 +797,7 @@ class AuthController extends Controller
                 'user' => $existingUser,
             ], now()->addMinutes(3));
 
-            return redirect('/login?google_exchange=' . $exchangeNonce);
+            return redirect('/login?google_exchange=' . $exchangeNonce . $redirectSuffix);
         }
 
         // New Google user -> MUST still fill all business registration fields (no skipping!)
@@ -773,7 +809,7 @@ class AuthController extends Controller
             'avatar' => $googleAvatar,
         ], now()->addMinutes(20));
 
-        return redirect('/login?tab=register&google_pending=' . $pendingNonce);
+        return redirect('/login?tab=register&google_pending=' . $pendingNonce . $redirectSuffix);
     }
 
     /**

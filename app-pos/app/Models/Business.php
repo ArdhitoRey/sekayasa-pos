@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class Business extends Model
 {
@@ -142,6 +143,15 @@ class Business extends Model
      */
     public function planLimits(): array
     {
+        if (!$this->is_active) {
+            return [
+                'plan_name' => 'Akun Dibekukan',
+                'max_outlets' => 0,
+                'max_users' => 0,
+                'max_products' => 0,
+            ];
+        }
+
         $sub = $this->relationLoaded('currentSubscription')
             ? $this->currentSubscription
             : $this->currentSubscription()->with('plan')->first();
@@ -156,10 +166,10 @@ class Business extends Model
         }
 
         return [
-            'plan_name' => 'Default / Belum Berlangganan',
-            'max_outlets' => 1,
-            'max_users' => 2,
-            'max_products' => 150,
+            'plan_name' => 'Belum Berlangganan',
+            'max_outlets' => 0,
+            'max_users' => 0,
+            'max_products' => 0,
         ];
     }
 
@@ -226,41 +236,67 @@ class Business extends Model
     }
 
     /**
-     * Activate or extend this business's template POS subscription while preserving remaining future days.
+     * Activate, renew, or upgrade this business's template POS subscription atomically with fair proration across tier changes.
      */
     public function applySubscriptionPeriod(Plan $plan, int $days, string $status = 'active'): Subscription
     {
-        $existing = Subscription::where('business_id', $this->id)->latest('id')->first();
-        $hasFutureExpiry = $existing && $existing->expires_at && $existing->expires_at->isFuture()
-            && in_array($existing->status, ['active', 'trial'], true);
+        return DB::transaction(function () use ($plan, $days, $status) {
+            self::whereKey($this->id)->lockForUpdate()->first();
 
-        $startsAt = $hasFutureExpiry && $existing->starts_at ? $existing->starts_at : now();
-        $baseEnd = $hasFutureExpiry ? $existing->expires_at->copy() : now();
+            $existing = Subscription::where('business_id', $this->id)
+                ->with('plan')
+                ->latest('id')
+                ->lockForUpdate()
+                ->first();
 
-        $subscription = Subscription::updateOrCreate(
-            ['business_id' => $this->id],
-            [
-                'plan_id' => $plan->id,
-                'status' => $status,
-                'starts_at' => $startsAt,
-                'expires_at' => $baseEnd->addDays($days),
-            ]
-        );
+            $hasFutureExpiry = $existing && $existing->expires_at && $existing->expires_at->isFuture()
+                && in_array($existing->status, ['active', 'trial'], true);
 
-        $this->update([
-            'service_type' => 'template_saas',
-            'is_active' => true,
-        ]);
+            $startsAt = now();
+            $expiresAt = now()->copy()->addDays($days);
 
-        if ($this->outlets()->count() === 0) {
-            Outlet::create([
-                'business_id' => $this->id,
-                'name' => 'Outlet Utama',
-                'address' => $this->address ?? 'Pusat',
+            if ($hasFutureExpiry) {
+                $samePlan = (int) $existing->plan_id === (int) $plan->id;
+                if ($samePlan || $existing->status === 'trial') {
+                    // Same tier renewal or trial conversion preserves full unused future days
+                    $startsAt = $existing->starts_at ?: now();
+                    $expiresAt = $existing->expires_at->copy()->addDays($days);
+                } else {
+                    // Prorate remaining unused monetary balance across tier switches
+                    $remainingDays = max(0, (int) now()->diffInDays($existing->expires_at, false));
+                    $oldMonthly = max(1, (float) ($existing->plan?->price_monthly ?? 0));
+                    $newMonthly = max(1, (float) $plan->price_monthly);
+                    $proratedDays = (int) floor($remainingDays * ($oldMonthly / $newMonthly));
+                    $startsAt = now();
+                    $expiresAt = now()->copy()->addDays($days + $proratedDays);
+                }
+            }
+
+            $subscription = Subscription::updateOrCreate(
+                ['business_id' => $this->id],
+                [
+                    'plan_id' => $plan->id,
+                    'status' => $status,
+                    'starts_at' => $startsAt,
+                    'expires_at' => $expiresAt,
+                ]
+            );
+
+            $this->update([
+                'service_type' => 'template_saas',
                 'is_active' => true,
             ]);
-        }
 
-        return $subscription->load('plan');
+            if ($this->outlets()->count() === 0) {
+                Outlet::create([
+                    'business_id' => $this->id,
+                    'name' => 'Outlet Utama',
+                    'address' => $this->address ?? 'Pusat',
+                    'is_active' => true,
+                ]);
+            }
+
+            return $subscription->load('plan');
+        });
     }
 }

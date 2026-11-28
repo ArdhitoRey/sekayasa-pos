@@ -5,7 +5,8 @@
 
     RewriteEngine On
 
-    # Block dot-files (.env, .git, .htaccess) and sensitive composer/log artifacts
+    # Allow ACME / Digital Asset Links (/.well-known/*) while blocking .env, .git, .htaccess
+    RewriteCond %{REQUEST_URI} !^/\.well-known/
     RewriteRule ^\. - [F,L]
     RewriteRule ^(composer\.(json|lock)|package(-lock)?\.json|phpunit\.xml)$ - [F,L]
 
@@ -30,4 +31,10 @@
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
+</IfModule>
+
+<IfModule mod_headers.c>
+    <FilesMatch "^(sw\.js|manifest\.json)$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+    </FilesMatch>
 </IfModule>

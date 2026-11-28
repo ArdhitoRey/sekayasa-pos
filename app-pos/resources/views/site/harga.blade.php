@@ -94,8 +94,13 @@
                         </ul>
                     </div>
 
-                    <div class="pt-4">
-                        <a href="/login?redirect={{ urlencode('/dashboard?tab=billing') }}" class="w-full {{ $isPopular ? 'btn btn-mint' : 'btn btn-jade' }}">
+                    @php
+                        $billingTarget = '/dashboard?tab=billing&plan=' . ($plan->slug ?? $plan->id);
+                    @endphp
+                    <div class="pt-4" x-data="{ target: '{{ $billingTarget }}' }">
+                        <a :href="(() => { try { const t = localStorage.getItem('pos_token'); const u = JSON.parse(localStorage.getItem('pos_user') || '{}'); if (t && u && u.role === 'owner') return target; } catch (_) {} return '/login?redirect=' + encodeURIComponent(target); })()"
+                            href="/login?redirect={{ urlencode($billingTarget) }}"
+                            class="w-full {{ $isPopular ? 'btn btn-mint' : 'btn btn-jade' }}">
                             Sewa Paket {{ $plan->name }} →
                         </a>
                     </div>

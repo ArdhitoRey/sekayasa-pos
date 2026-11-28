@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
+use App\Models\Business;
 use App\Models\Category;
 use App\Models\Inventory;
 use App\Models\Outlet;
@@ -27,6 +28,15 @@ class ProductController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Akses produk hanya untuk akun bisnis.'], 403);
         }
         $outletId = $request->query('outlet_id', $user->outlet_id);
+        if ($user->role === 'cashier') {
+            if (!$user->outlet_id) {
+                return response()->json(['status' => 'error', 'message' => 'Akun kasir belum ditugaskan ke outlet.'], 403);
+            }
+            if ($outletId && (int) $outletId !== (int) $user->outlet_id) {
+                return response()->json(['status' => 'error', 'message' => 'Kasir hanya dapat melihat produk pada outlet tempat bertugas.'], 403);
+            }
+            $outletId = $user->outlet_id;
+        }
         if ($outletId) {
             Outlet::where('business_id', $businessId)->findOrFail($outletId);
         }
@@ -49,7 +59,7 @@ class ProductController extends Controller
             $query->where('category_id', $catId);
         }
 
-        $products = $query->get()->map(function ($product) use ($outletId) {
+        $products = $query->get()->map(function ($product) use ($outletId, $user) {
             $stock = 0;
             if ($outletId) {
                 $inv = Inventory::where('outlet_id', $outletId)
@@ -59,6 +69,9 @@ class ProductController extends Controller
             }
             $product->current_stock = $stock;
             $product->is_low_stock = $stock <= $product->min_stock_alert;
+            if ($user->role !== 'owner') {
+                $product->makeHidden('buy_price');
+            }
             return $product;
         });
 
@@ -87,23 +100,13 @@ class ProductController extends Controller
             }
         }
 
-        $business = $user->business;
-        $limits = $business ? $business->planLimits() : ['max_products' => 150, 'plan_name' => 'Default'];
-        $currentCount = Product::where('business_id', $user->business_id)->where('is_active', true)->count();
-        if ($currentCount >= $limits['max_products']) {
-            return response()->json([
-                'status' => 'error',
-                'message' => "Batas maksimal produk untuk paket {$limits['plan_name']} ({$limits['max_products']} produk) telah tercapai.",
-            ], 403);
-        }
-
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'category_id' => 'nullable|exists:categories,id',
             'unit_id' => 'nullable|exists:units,id',
             'sku' => 'nullable|string|max:50',
             'barcode' => 'nullable|string|max:50',
-            'buy_price' => 'required|numeric|min:0',
+            'buy_price' => ($user->role === 'owner' ? 'required|numeric|min:0' : 'nullable|numeric|min:0'),
             'sell_price' => 'required|numeric|min:0',
             'min_stock_alert' => 'nullable|integer|min:0',
             'initial_stock' => 'nullable|integer|min:0',
@@ -126,58 +129,79 @@ class ProductController extends Controller
 
         $imagePath = $request->file('image')->store('products', 'public');
 
-        return DB::transaction(function () use ($user, $validated, $imagePath, $request) {
-            $product = Product::create([
-                'business_id' => $user->business_id,
-                'category_id' => $validated['category_id'] ?? null,
-                'unit_id' => $validated['unit_id'] ?? null,
-                'name' => $validated['name'],
-                'sku' => $validated['sku'] ?? null,
-                'barcode' => $validated['barcode'] ?? null,
-                'buy_price' => $validated['buy_price'],
-                'sell_price' => $validated['sell_price'],
-                'min_stock_alert' => $validated['min_stock_alert'] ?? 5,
-                'image_path' => $imagePath,
-                'is_active' => true,
-            ]);
+        try {
+            return DB::transaction(function () use ($user, $validated, $imagePath, $request) {
+                $business = Business::where('id', $user->business_id)->lockForUpdate()->first();
+                $limits = $business ? $business->planLimits() : ['max_products' => 150, 'plan_name' => 'Default'];
+                $currentCount = Product::where('business_id', $user->business_id)->where('is_active', true)->count();
+                if ($currentCount >= $limits['max_products']) {
+                    Storage::disk('public')->delete($imagePath);
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => "Batas maksimal produk untuk paket {$limits['plan_name']} ({$limits['max_products']} produk) telah tercapai.",
+                    ], 403);
+                }
 
-            // Set initial stock if provided
-            $outletId = $validated['outlet_id'] ?? $user->outlet_id;
-            if ($outletId && isset($validated['initial_stock']) && $validated['initial_stock'] > 0) {
-                Inventory::updateOrCreate(
-                    ['outlet_id' => $outletId, 'product_id' => $product->id],
-                    ['business_id' => $user->business_id, 'stock_quantity' => $validated['initial_stock']]
+                $product = Product::create([
+                    'business_id' => $user->business_id,
+                    'category_id' => $validated['category_id'] ?? null,
+                    'unit_id' => $validated['unit_id'] ?? null,
+                    'name' => $validated['name'],
+                    'sku' => $validated['sku'] ?? null,
+                    'barcode' => $validated['barcode'] ?? null,
+                    'buy_price' => $user->role === 'owner' ? $validated['buy_price'] : 0,
+                    'sell_price' => $validated['sell_price'],
+                    'min_stock_alert' => $validated['min_stock_alert'] ?? 5,
+                    'image_path' => $imagePath,
+                    'is_active' => true,
+                ]);
+
+                // Set initial stock if provided
+                $outletId = $validated['outlet_id'] ?? $user->outlet_id;
+                if ($outletId && isset($validated['initial_stock']) && $validated['initial_stock'] > 0) {
+                    Inventory::updateOrCreate(
+                        ['outlet_id' => $outletId, 'product_id' => $product->id],
+                        ['business_id' => $user->business_id, 'stock_quantity' => $validated['initial_stock']]
+                    );
+
+                    StockMovement::create([
+                        'business_id' => $user->business_id,
+                        'outlet_id' => $outletId,
+                        'product_id' => $product->id,
+                        'type' => 'adjustment_add',
+                        'quantity_before' => 0,
+                        'quantity_change' => $validated['initial_stock'],
+                        'quantity_after' => $validated['initial_stock'],
+                        'reason' => 'Stok Awal Produk Baru',
+                        'user_id' => $user->id,
+                    ]);
+                }
+
+                ActivityLog::record(
+                    $user->business_id,
+                    $user->id,
+                    'product_created',
+                    'Product',
+                    $product->id,
+                    ['name' => $product->name, 'sell_price' => (float) $product->sell_price],
+                    $request->ip()
                 );
 
-                StockMovement::create([
-                    'business_id' => $user->business_id,
-                    'outlet_id' => $outletId,
-                    'product_id' => $product->id,
-                    'type' => 'adjustment_add',
-                    'quantity_before' => 0,
-                    'quantity_change' => $validated['initial_stock'],
-                    'quantity_after' => $validated['initial_stock'],
-                    'reason' => 'Stok Awal Produk Baru',
-                    'user_id' => $user->id,
-                ]);
-            }
+                $loaded = $product->load('category', 'unit');
+                if ($user->role !== 'owner') {
+                    $loaded->makeHidden('buy_price');
+                }
 
-            ActivityLog::record(
-                $user->business_id,
-                $user->id,
-                'product_created',
-                'Product',
-                $product->id,
-                ['name' => $product->name, 'sell_price' => (float) $product->sell_price],
-                $request->ip()
-            );
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Produk berhasil ditambahkan',
-                'data' => $product->load('category', 'unit'),
-            ], 201);
-        });
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Produk berhasil ditambahkan',
+                    'data' => $loaded,
+                ], 201);
+            });
+        } catch (\Throwable $e) {
+            Storage::disk('public')->delete($imagePath);
+            throw $e;
+        }
     }
 
     /**
@@ -196,15 +220,13 @@ class ProductController extends Controller
             }
         }
 
-        $product = Product::where('business_id', $user->business_id)->findOrFail($id);
-
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'category_id' => 'nullable|exists:categories,id',
             'unit_id' => 'nullable|exists:units,id',
             'sku' => 'nullable|string|max:50',
             'barcode' => 'nullable|string|max:50',
-            'buy_price' => 'sometimes|required|numeric|min:0',
+            'buy_price' => 'sometimes|nullable|numeric|min:0',
             'sell_price' => 'sometimes|required|numeric|min:0',
             'min_stock_alert' => 'nullable|integer|min:0',
             'is_active' => 'boolean',
@@ -212,26 +234,60 @@ class ProductController extends Controller
         ]);
 
         $data = collect($validated)->except(['image'])->toArray();
-        if (!empty($validated['category_id'])) {
-            Category::where('business_id', $user->business_id)->findOrFail($validated['category_id']);
+        // Admin cannot view or overwrite supplier HPP (buy_price)
+        if ($user->role !== 'owner') {
+            unset($data['buy_price']);
+        } elseif (array_key_exists('buy_price', $data) && $data['buy_price'] === null) {
+            unset($data['buy_price']);
+        }
+        if (array_key_exists('category_id', $validated)) {
+            if (!empty($validated['category_id'])) {
+                Category::where('business_id', $user->business_id)->findOrFail($validated['category_id']);
+            } else {
+                $data['category_id'] = null;
+            }
         }
         if (!empty($validated['unit_id'])) {
             Unit::where('business_id', $user->business_id)->findOrFail($validated['unit_id']);
         }
-        if ($request->hasFile('image')) {
-            if ($product->image_path && !str_starts_with($product->image_path, '/assets/')) {
-                Storage::disk('public')->delete($product->image_path);
+
+        return DB::transaction(function () use ($user, $id, $validated, &$data, $request) {
+            $business = Business::where('id', $user->business_id)->lockForUpdate()->first();
+            $product = Product::where('business_id', $user->business_id)->lockForUpdate()->findOrFail($id);
+
+            if (!empty($validated['is_active']) && !$product->is_active) {
+                $limits = $business ? $business->planLimits() : ['max_products' => 150, 'plan_name' => 'Default'];
+                $activeOthers = Product::where('business_id', $user->business_id)
+                    ->where('is_active', true)
+                    ->where('id', '!=', $product->id)
+                    ->count();
+                if ($activeOthers >= $limits['max_products']) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => "Batas maksimal produk untuk paket {$limits['plan_name']} ({$limits['max_products']} produk) telah tercapai.",
+                    ], 403);
+                }
             }
-            $data['image_path'] = $request->file('image')->store('products', 'public');
-        }
 
-        $product->update($data);
+            if ($request->hasFile('image')) {
+                if ($product->image_path && !str_starts_with($product->image_path, '/assets/')) {
+                    Storage::disk('public')->delete($product->image_path);
+                }
+                $data['image_path'] = $request->file('image')->store('products', 'public');
+            }
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Produk berhasil diperbarui',
-            'data' => $product->load('category', 'unit'),
-        ]);
+            $product->update($data);
+            $loaded = $product->load('category', 'unit');
+            if ($user->role !== 'owner') {
+                $loaded->makeHidden('buy_price');
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Produk berhasil diperbarui',
+                'data' => $loaded,
+            ]);
+        });
     }
 
     /**
@@ -269,8 +325,22 @@ class ProductController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Akses produk hanya untuk akun bisnis.'], 403);
         }
         $outletId = $request->query('outlet_id', $user->outlet_id);
+        $outlet = null;
         if ($outletId) {
-            Outlet::where('business_id', $user->business_id)->findOrFail($outletId);
+            $outlet = Outlet::where('business_id', $user->business_id)->findOrFail($outletId);
+            if ($user->role === 'cashier' && $user->outlet_id && (int) $outlet->id !== (int) $user->outlet_id) {
+                return response()->json(['status' => 'error', 'message' => 'Kasir hanya dapat memeriksa barcode pada outlet tempat bertugas.'], 403);
+            }
+        } elseif ($user->role === 'cashier' && $user->outlet_id) {
+            $outlet = Outlet::where('business_id', $user->business_id)->find($user->outlet_id);
+            $outletId = $outlet?->id;
+        }
+
+        if ($user->role === 'cashier' && $user->business) {
+            $settings = $user->business->resolvedFeatureSettings($outlet);
+            if (empty($settings['pos_allow_barcode'])) {
+                return response()->json(['status' => 'error', 'message' => 'Pemilik bisnis menonaktifkan fitur scan barcode pada outlet ini.'], 403);
+            }
         }
 
         $product = Product::where('business_id', $user->business_id)
@@ -288,6 +358,9 @@ class ProductController extends Controller
 
         $inv = Inventory::where('outlet_id', $outletId)->where('product_id', $product->id)->first();
         $product->current_stock = $inv ? $inv->stock_quantity : 0;
+        if ($user->role !== 'owner') {
+            $product->makeHidden('buy_price');
+        }
 
         return response()->json([
             'status' => 'success',

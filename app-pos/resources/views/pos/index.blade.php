@@ -277,10 +277,21 @@
                         </button>
                         <h2 class="text-sm font-bold text-[#0D2620] truncate" x-text="isPreviewMode ? 'Simulasi Keranjang (Preview)' : 'Keranjang Belanja'"></h2>
                     </div>
-                    <button type="button" @click="clearCart()" x-show="cart.length > 0"
-                        class="inline-flex items-center px-2.5 py-1 rounded-md border border-rose-200 bg-white hover:bg-rose-50 hover:border-rose-300 text-rose-600 text-[11px] font-medium shrink-0 transition">
-                        Kosongkan
-                    </button>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <button type="button" @click="openHeldOrdersModal()" x-show="!isPreviewMode" x-cloak
+                            class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-[#0D2620] text-[11px] font-semibold transition">
+                            <span>Tertahan</span>
+                            <span x-show="heldOrders.length > 0" class="px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold tabular-nums" x-text="heldOrders.length"></span>
+                        </button>
+                        <button type="button" @click="holdCurrentOrder()" x-show="!isPreviewMode && cart.length > 0" :disabled="isProcessingHold" x-cloak
+                            class="inline-flex items-center px-2.5 py-1 rounded-md border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 text-[11px] font-semibold transition disabled:opacity-40">
+                            <span x-text="isProcessingHold ? 'Menahan...' : 'Tahan'"></span>
+                        </button>
+                        <button type="button" @click="clearCart()" x-show="cart.length > 0"
+                            class="inline-flex items-center px-2.5 py-1 rounded-md border border-rose-200 bg-white hover:bg-rose-50 hover:border-rose-300 text-rose-600 text-[11px] font-medium shrink-0 transition">
+                            Kosongkan
+                        </button>
+                    </div>
                 </div>
 
                 <div x-show="hasPosFeature('pos_allow_customer')" class="flex items-center gap-2">
@@ -452,14 +463,14 @@
     </div>
 
     <!-- 2. Thermal Receipt Modal -->
-    <div x-show="showReceiptModal" class="fixed inset-0 bg-[#0D2620]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" x-cloak>
+    <div x-show="showReceiptModal" class="tandha-print-overlay fixed inset-0 bg-[#0D2620]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" x-cloak>
         <div class="tandha-modal-card bg-[#F7FAF9] rounded-xl max-w-sm w-full overflow-hidden border" @click.outside="showReceiptModal = false">
             <div class="p-4 bg-[#0D2620] text-[#FFFFFF] flex justify-between items-center">
                 <span class="text-xs font-bold uppercase">Struk Transaksi</span>
                 <button @click="showReceiptModal = false" class="text-[#CBD5E1]"><i data-lucide="x" class="w-4 h-4"></i></button>
             </div>
 
-            <div class="p-5 max-h-[70vh] overflow-y-auto">
+            <div class="p-5 max-h-[70vh] overflow-y-auto tandha-print-scroll-reset">
                 <div x-show="lastReceipt.is_preview" x-cloak class="mb-3 px-3 py-2 rounded-md bg-amber-50 border border-amber-200 text-[11px] font-semibold text-amber-900 text-center">
                     CONTOH STRUK PREVIEW (READ-ONLY) — Tidak tercatat di riwayat penjualan maupun memotong stok.
                 </div>
@@ -736,6 +747,48 @@
         </div>
     </div>
 
+    <!-- 8. Held Orders Modal -->
+    <div x-show="showHeldModal" @click.self="showHeldModal = false" class="fixed inset-0 bg-[#0D2620]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" x-cloak>
+        <div class="tandha-modal-card bg-white rounded-xl max-w-xl w-full border overflow-hidden flex flex-col max-h-[82vh]">
+            <div class="px-5 py-3.5 bg-[#0D2620] text-[#FFFFFF] flex justify-between items-center shrink-0">
+                <div>
+                    <h3 class="text-sm font-bold">Daftar Pesanan Tertahan (Hold)</h3>
+                    <p class="text-[11px] text-[#CBD5E1]">Pilih pesanan untuk dimuat kembali ke keranjang kasir.</p>
+                </div>
+                <button type="button" @click="showHeldModal = false" class="text-slate-300 hover:text-white"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+            <div class="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-4 space-y-2.5 bg-[#F7FAF9]">
+                <div x-show="loadingHeldOrders" class="py-10 text-center text-xs text-slate-500">Memuat pesanan tertahan...</div>
+                <div x-show="!loadingHeldOrders && heldOrders.length === 0" class="py-10 text-center text-xs text-slate-500">
+                    Belum ada pesanan yang ditahan pada outlet ini.
+                </div>
+                <template x-for="held in heldOrders" :key="held.id">
+                    <div class="bg-white border border-slate-200 rounded-lg p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="min-w-0 flex-1 space-y-1">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="text-xs font-bold text-[#0D7A5F] tabular-nums" x-text="held.invoice_number"></span>
+                                <span class="text-[11px] font-semibold text-[#0D2620]" x-text="held.customer ? held.customer.name : 'Pelanggan Umum'"></span>
+                                <span class="text-[10px] text-slate-400" x-text="formatDate(held.created_at)"></span>
+                            </div>
+                            <div class="text-[11px] text-slate-600 truncate"
+                                x-text="(held.items || []).map(i => i.quantity + 'x ' + i.product_name).join(', ') || ((held.cart_payload && held.cart_payload.length ? held.cart_payload.length + ' item' : 'Keranjang tersimpan'))"></div>
+                            <div x-show="held.notes" class="text-[10px] text-amber-700 font-medium" x-text="'Catatan: ' + held.notes"></div>
+                        </div>
+                        <div class="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                            <div class="text-right">
+                                <div class="text-xs font-bold text-[#0D2620] tabular-nums" x-text="formatRupiah(held.total_amount)"></div>
+                            </div>
+                            <button type="button" @click="resumeHeldOrder(held.id)" :disabled="resumingHeldId === held.id"
+                                class="px-3 py-1.5 bg-[#0D7A5F] hover:bg-[#095C47] text-white rounded-md text-xs font-bold transition disabled:opacity-40">
+                                <span x-text="resumingHeldId === held.id ? 'Memuat...' : 'Lanjutkan'"></span>
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
     <!-- Floating Action Popover Menu (Sama persis dengan Super Admin) -->
     <div x-show="showPosActionPopup" @click="showPosActionPopup = false" class="fixed inset-0 z-[60]" x-cloak></div>
     <div x-show="showPosActionPopup" x-transition.opacity.duration.120ms :style="posActionMenuStyle"
@@ -774,7 +827,7 @@ function posApp() {
     );
     return {
         token: localStorage.getItem('pos_token') || '',
-        user: JSON.parse(localStorage.getItem('pos_user') || '{}'),
+        user: (() => { try { return JSON.parse(localStorage.getItem('pos_user') || '{}') || {}; } catch (_) { localStorage.removeItem('pos_user'); return {}; } })(),
         business: {},
         currentOutlet: {},
         categories: [],
@@ -839,6 +892,15 @@ function posApp() {
         showDiscountModal: false,
         showHistoryModal: false,
         historyList: [],
+        heldOrders: [],
+        showHeldModal: false,
+        loadingHeldOrders: false,
+        isProcessingHold: false,
+        resumingHeldId: null,
+        isOpeningShift: false,
+        isClosingShift: false,
+        isSavingCustomer: false,
+        isProcessingVoid: false,
         showCreateCustomerModal: false,
         newCustomer: { name: '', phone: '', email: '', notes: '' },
         deferredInstallPrompt: null,
@@ -962,6 +1024,7 @@ function posApp() {
                     this.loadProducts(),
                     this.loadCategories(),
                     this.loadCustomers(),
+                    (!this.isPreviewMode) ? this.loadHeldOrders() : Promise.resolve(),
                 ]);
             } finally {
                 this.isPosBooting = false;
@@ -969,6 +1032,10 @@ function posApp() {
 
             window.addEventListener('keydown', (e) => {
                 if (e.key === 'F4') {
+                    const anyModalOpen = this.showPaymentModal || this.showReceiptModal || this.showHistoryModal ||
+                        this.showHeldModal || this.showOpenShiftModal || this.showCloseShiftModal ||
+                        this.showDiscountModal || this.showCreateCustomerModal;
+                    if (anyModalOpen) return;
                     e.preventDefault();
                     if (this.cart.length > 0 || this.isPreviewMode) this.openPaymentModal();
                 }
@@ -980,7 +1047,17 @@ function posApp() {
             this.isPosFetching += 1;
             try {
                 const res = await fetch(url, options);
-                if (res.status === 401) { localStorage.removeItem('pos_token'); window.location.href = this.isKasirAppMode ? '/login?app=kasir' : '/login'; throw new Error('Expired'); }
+                if (res.status === 401) {
+                    localStorage.removeItem('pos_token');
+                    localStorage.removeItem('pos_user');
+                    const loginUrl = this.isKasirAppMode ? '/login?app=kasir' : '/login';
+                    if (this.isEmbedded && window.top) {
+                        try { window.top.location.href = loginUrl; } catch (_) { window.location.href = loginUrl; }
+                    } else {
+                        window.location.href = loginUrl;
+                    }
+                    throw new Error('Expired');
+                }
                 return res;
             } finally {
                 this.isPosFetching = Math.max(0, this.isPosFetching - 1);
@@ -1006,8 +1083,8 @@ function posApp() {
 
         async loadInitialData() {
             const res = await this.authFetch('/api/me');
-            const data = await res.json();
-            if (data.status === 'success') {
+            const data = await this.parseJsonSafe(res);
+            if (res.ok && data.status === 'success') {
                 this.user = data.data;
                 if (this.isKasirAppMode && this.user.role !== 'cashier') {
                     // Lock installed Kasir APK strictly to cashier role: clear inherited Owner/Admin browser session cleanly
@@ -1054,29 +1131,150 @@ function posApp() {
             }
             return false;
         },
+        async parseJsonSafe(res) {
+            const raw = await res.text();
+            try {
+                return raw ? JSON.parse(raw) : {};
+            } catch (_) {
+                return {};
+            }
+        },
         async loadShift() {
             if (this.isPreviewMode) {
                 this.activeShift = null;
                 return;
             }
-            const res = await this.authFetch(`/api/shifts/current?outlet_id=${this.currentOutlet.id || 1}`);
-            const data = await res.json();
-            this.activeShift = data.data;
+            try {
+                const res = await this.authFetch(`/api/shifts/current?outlet_id=${this.currentOutlet.id || 1}`);
+                const data = await this.parseJsonSafe(res);
+                if (res.ok) this.activeShift = data.data;
+            } catch (_) {}
         },
         async loadProducts() {
-            const res = await this.authFetch(`/api/products?outlet_id=${this.currentOutlet.id || 1}`);
-            const data = await res.json();
-            if (data.status === 'success') { this.products = data.data; this.filterProducts(); }
+            try {
+                const res = await this.authFetch(`/api/products?outlet_id=${this.currentOutlet.id || 1}`);
+                const data = await this.parseJsonSafe(res);
+                if (res.ok && data.status === 'success') { this.products = data.data; this.filterProducts(); }
+            } catch (_) {}
         },
         async loadCategories() {
-            const res = await this.authFetch('/api/categories');
-            const data = await res.json();
-            if (data.status === 'success') this.categories = data.data;
+            try {
+                const res = await this.authFetch('/api/categories');
+                const data = await this.parseJsonSafe(res);
+                if (res.ok && data.status === 'success') this.categories = data.data;
+            } catch (_) {}
         },
         async loadCustomers() {
-            const res = await this.authFetch('/api/customers');
-            const data = await res.json();
-            if (data.status === 'success') this.customers = data.data;
+            if (!this.hasPosFeature('pos_allow_customer')) {
+                this.customers = [];
+                return;
+            }
+            try {
+                const res = await this.authFetch('/api/customers');
+                const data = await this.parseJsonSafe(res);
+                if (res.ok && data.status === 'success') this.customers = data.data;
+            } catch (_) {}
+        },
+        async loadHeldOrders() {
+            if (this.isPreviewMode) {
+                this.heldOrders = [];
+                return;
+            }
+            this.loadingHeldOrders = true;
+            try {
+                const res = await this.authFetch(`/api/pos/held?outlet_id=${this.currentOutlet.id || 1}`);
+                const data = await this.parseJsonSafe(res);
+                if (res.ok && data.status === 'success') {
+                    this.heldOrders = Array.isArray(data.data) ? data.data : [];
+                }
+            } catch (_) {
+            } finally {
+                this.loadingHeldOrders = false;
+            }
+        },
+        async openHeldOrdersModal() {
+            if (this.isPreviewMode) return;
+            this.showHeldModal = true;
+            await this.loadHeldOrders();
+            this.$nextTick(() => { if (window.lucide) lucide.createIcons(); });
+        },
+        async holdCurrentOrder() {
+            if (this.isPreviewMode || this.cart.length === 0 || this.isProcessingHold) return;
+            this.isProcessingHold = true;
+            try {
+                const allowCust = this.hasPosFeature('pos_allow_customer');
+                const allowNotes = this.hasPosFeature('pos_allow_notes');
+                const res = await this.authFetch('/api/pos/hold', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        outlet_id: this.currentOutlet.id || 1,
+                        customer_id: allowCust ? (this.selectedCustomerId || null) : null,
+                        notes: allowNotes ? (this.orderNotes || null) : null,
+                        items: this.cart.map((c) => ({ product_id: c.product_id, quantity: c.quantity })),
+                    }),
+                });
+                const result = await this.parseJsonSafe(res);
+                if (res.ok) {
+                    this.clearCart();
+                    this.selectedCustomerId = '';
+                    await this.loadHeldOrders();
+                    Swal.fire({ icon: 'success', title: 'Pesanan Ditahan', text: 'Pesanan tersimpan sementara. Klik tombol "Tertahan" kapan saja untuk melanjutkan.', timer: 1600, showConfirmButton: false });
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Gagal Menahan Pesanan', text: result.message || 'Periksa isi keranjang dan coba lagi.', confirmButtonColor: '#0D7A5F' });
+                }
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'Gagal Menahan Pesanan', text: e.message || 'Koneksi ke server terputus.', confirmButtonColor: '#0D7A5F' });
+            } finally {
+                this.isProcessingHold = false;
+            }
+        },
+        async resumeHeldOrder(heldId) {
+            if (this.isPreviewMode || this.resumingHeldId) return;
+            if (this.cart.length > 0) {
+                const { isConfirmed } = await Swal.fire({
+                    icon: 'question',
+                    title: 'Ganti Keranjang Saat Ini?',
+                    text: 'Keranjang kasir saat ini masih berisi item. Melanjutkan pesanan tertahan akan mengganti keranjang saat ini.',
+                    showCancelButton: true,
+                    confirmButtonText: 'Ya, Muat Pesanan',
+                    cancelButtonText: 'Batal',
+                    confirmButtonColor: '#0D7A5F',
+                });
+                if (!isConfirmed) return;
+            }
+            this.resumingHeldId = heldId;
+            try {
+                const res = await this.authFetch(`/api/pos/held/${heldId}/resume`, { method: 'DELETE' });
+                const result = await this.parseJsonSafe(res);
+                if (res.ok && result.data) {
+                    const payload = Array.isArray(result.data.cart_payload) && result.data.cart_payload.length > 0
+                        ? result.data.cart_payload
+                        : (result.data.items || []).map((it) => ({ product_id: it.product_id, quantity: it.quantity }));
+                    const nextCart = [];
+                    for (const entry of payload) {
+                        const prod = this.products.find((p) => Number(p.id) === Number(entry.product_id));
+                        if (!prod || Number(prod.current_stock || 0) <= 0) continue;
+                        const qty = Math.min(Math.max(1, Number(entry.quantity || 1)), Number(prod.current_stock));
+                        nextCart.push({ product_id: prod.id, name: prod.name, price: Number(prod.sell_price), max_stock: Number(prod.current_stock), quantity: qty });
+                    }
+                    if (nextCart.length === 0) {
+                        Swal.fire({ icon: 'warning', title: 'Stok Item Habis', text: 'Produk dalam pesanan tertahan saat ini kehabisan stok.', confirmButtonColor: '#0D7A5F' });
+                    }
+                    this.cart = nextCart;
+                    this.selectedCustomerId = (this.hasPosFeature('pos_allow_customer') && result.data.customer_id) ? result.data.customer_id : '';
+                    this.orderNotes = (this.hasPosFeature('pos_allow_notes') && result.data.notes) ? result.data.notes : '';
+                    this.discountAmount = 0;
+                    this.discountType = null;
+                    this.showHeldModal = false;
+                    await this.loadHeldOrders();
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Gagal Memuat Pesanan', text: result.message || 'Pesanan tertahan tidak ditemukan.', confirmButtonColor: '#0D7A5F' });
+                }
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'Gagal Memuat Pesanan', text: e.message || 'Koneksi ke server terputus.', confirmButtonColor: '#0D7A5F' });
+            } finally {
+                this.resumingHeldId = null;
+            }
         },
 
         filterProducts() {
@@ -1107,11 +1305,15 @@ function posApp() {
         },
 
         async scanBarcode() {
-            if (!this.barcodeInput) return;
-            const res = await this.authFetch(`/api/products/barcode/${encodeURIComponent(this.barcodeInput)}?outlet_id=${this.currentOutlet.id || 1}`);
-            const result = await res.json();
-            if (res.ok && result.data) { this.addToCart(result.data); this.barcodeInput = ''; }
-            else Swal.fire({ icon: 'warning', title: 'Tidak Ditemukan', text: result.message, timer: 1500, showConfirmButton: false });
+            if (!this.barcodeInput || !this.hasPosFeature('pos_allow_barcode')) return;
+            try {
+                const res = await this.authFetch(`/api/products/barcode/${encodeURIComponent(this.barcodeInput)}?outlet_id=${this.currentOutlet.id || 1}`);
+                const result = await this.parseJsonSafe(res);
+                if (res.ok && result.data) { this.addToCart(result.data); this.barcodeInput = ''; }
+                else Swal.fire({ icon: 'warning', title: 'Tidak Ditemukan', text: result.message || 'Produk tidak ditemukan.', timer: 1500, showConfirmButton: false });
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'Gagal Scan Barcode', text: e.message || 'Koneksi terputus.', confirmButtonColor: '#0D7A5F' });
+            }
         },
 
         addToCart(product) {
@@ -1218,6 +1420,7 @@ function posApp() {
                 Swal.fire({ icon: 'info', title: 'Mode Tinjau Pemilik', text: 'Akun Owner hanya meninjau tampilan kasir. Masuk dengan akun Kasir untuk mencatat transaksi nyata.', confirmButtonColor: '#0D7A5F' });
                 return;
             }
+            if (this.isProcessingCheckout) return;
             this.isProcessingCheckout = true;
             try {
                 const allowDisc = this.hasPosFeature('pos_allow_discount');
@@ -1238,7 +1441,7 @@ function posApp() {
                         notes: allowNotes ? (this.orderNotes || null) : null,
                     }),
                 });
-                const result = await res.json();
+                const result = await this.parseJsonSafe(res);
                 if (res.ok) {
                     this.lastReceipt = result.data.receipt;
                     this.showPaymentModal = false;
@@ -1251,8 +1454,10 @@ function posApp() {
                         this.showPaymentModal = false;
                         this.showOpenShiftModal = true;
                     }
-                    Swal.fire({ icon: 'error', title: 'Gagal', text: result.message, confirmButtonColor: '#0D7A5F' });
+                    Swal.fire({ icon: 'error', title: 'Gagal', text: result.message || 'Gagal memproses transaksi.', confirmButtonColor: '#0D7A5F' });
                 }
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'Gagal', text: e.message || 'Koneksi ke server terputus.', confirmButtonColor: '#0D7A5F' });
             } finally { this.isProcessingCheckout = false; }
         },
 
@@ -1262,21 +1467,29 @@ function posApp() {
                 Swal.fire({ icon: 'info', title: 'Mode Tinjau Pemilik', text: 'Shift kasir hanya dibuka oleh akun Kasir.', confirmButtonColor: '#0D7A5F' });
                 return;
             }
-            const res = await this.authFetch('/api/shifts/open', {
-                method: 'POST',
-                body: JSON.stringify({
-                    outlet_id: this.currentOutlet.id || 1,
-                    initial_cash: this.initialCashInput,
-                    notes: this.shiftOpenNotes || null,
-                }),
-            });
-            const result = await res.json();
-            if (res.ok) {
-                this.activeShift = result.data;
-                this.shiftOpenNotes = '';
-                this.showOpenShiftModal = false;
-            } else {
-                Swal.fire({ icon: 'error', title: 'Gagal Membuka Shift', text: result.message || 'Periksa kas awal laci.', confirmButtonColor: '#0D7A5F' });
+            if (this.isOpeningShift) return;
+            this.isOpeningShift = true;
+            try {
+                const res = await this.authFetch('/api/shifts/open', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        outlet_id: this.currentOutlet.id || 1,
+                        initial_cash: this.initialCashInput,
+                        notes: this.shiftOpenNotes || null,
+                    }),
+                });
+                const result = await this.parseJsonSafe(res);
+                if (res.ok) {
+                    this.activeShift = result.data;
+                    this.shiftOpenNotes = '';
+                    this.showOpenShiftModal = false;
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Gagal Membuka Shift', text: result.message || 'Periksa kas awal laci.', confirmButtonColor: '#0D7A5F' });
+                }
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'Gagal Membuka Shift', text: e.message || 'Koneksi ke server terputus.', confirmButtonColor: '#0D7A5F' });
+            } finally {
+                this.isOpeningShift = false;
             }
         },
         openCloseShiftModal() {
@@ -1285,30 +1498,39 @@ function posApp() {
             this.showCloseShiftModal = true;
         },
         async submitCloseShift() {
-            if (this.isPreviewMode) return;
-            const res = await this.authFetch(`/api/shifts/${this.activeShift.id}/close`, {
-                method: 'POST',
-                body: JSON.stringify({
-                    actual_cash: this.actualCashInput,
-                    notes: this.shiftCloseNotes || null,
-                }),
-            });
-            const result = await res.json();
-            if (res.ok) {
-                const summary = result.data.summary;
-                this.activeShift = null;
-                this.showCloseShiftModal = false;
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Shift Kasir Ditutup',
-                    html: `<div style="text-align:left;font-size:13px;line-height:1.6">
-                        Transaksi Selesai: <b>${summary.transactions_count ?? '-'}</b><br>
-                        Kas Seharusnya: <b>${this.formatRupiah(summary.expected_cash)}</b><br>
-                        Kas Aktual Laci: <b>${this.formatRupiah(summary.actual_cash)}</b><br>
-                        Selisih: <b>${this.formatRupiah(summary.cash_variance)} (${summary.variance_status})</b>
-                    </div>`,
-                    confirmButtonColor: '#0D7A5F',
+            if (this.isPreviewMode || this.isClosingShift || !this.activeShift) return;
+            this.isClosingShift = true;
+            try {
+                const res = await this.authFetch(`/api/shifts/${this.activeShift.id}/close`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        actual_cash: this.actualCashInput,
+                        notes: this.shiftCloseNotes || null,
+                    }),
                 });
+                const result = await this.parseJsonSafe(res);
+                if (res.ok) {
+                    const summary = result.data.summary;
+                    this.activeShift = null;
+                    this.showCloseShiftModal = false;
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Shift Kasir Ditutup',
+                        html: `<div style="text-align:left;font-size:13px;line-height:1.6">
+                            Transaksi Selesai: <b>${summary.transactions_count ?? '-'}</b><br>
+                            Kas Seharusnya: <b>${this.formatRupiah(summary.expected_cash)}</b><br>
+                            Kas Aktual Laci: <b>${this.formatRupiah(summary.actual_cash)}</b><br>
+                            Selisih: <b>${this.formatRupiah(summary.cash_variance)} (${summary.variance_status})</b>
+                        </div>`,
+                        confirmButtonColor: '#0D7A5F',
+                    });
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Gagal Menutup Shift', text: result.message || 'Shift tidak dapat ditutup.', confirmButtonColor: '#0D7A5F' });
+                }
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'Gagal Menutup Shift', text: e.message || 'Koneksi ke server terputus.', confirmButtonColor: '#0D7A5F' });
+            } finally {
+                this.isClosingShift = false;
             }
         },
         openCreateCustomerModal() {
@@ -1320,32 +1542,47 @@ function posApp() {
             this.showCreateCustomerModal = true;
         },
         async submitCreateCustomer() {
-            if (this.isPreviewMode) return;
-            const res = await this.authFetch('/api/customers', {
-                method: 'POST',
-                body: JSON.stringify(this.newCustomer),
-            });
-            const result = await res.json();
-            if (res.ok && result.data) {
-                await this.loadCustomers();
-                this.selectedCustomerId = result.data.id;
-                this.showCreateCustomerModal = false;
-                Swal.fire({ icon: 'success', title: 'Pelanggan Ditambahkan', timer: 1300, showConfirmButton: false });
-            } else {
-                const firstErr = result.errors ? Object.values(result.errors).flat()[0] : null;
-                Swal.fire({ icon: 'error', title: 'Gagal', text: firstErr || result.message, confirmButtonColor: '#0D7A5F' });
+            if (this.isPreviewMode || this.isSavingCustomer) return;
+            this.isSavingCustomer = true;
+            try {
+                const res = await this.authFetch('/api/customers', {
+                    method: 'POST',
+                    body: JSON.stringify(this.newCustomer),
+                });
+                const result = await this.parseJsonSafe(res);
+                if (res.ok && result.data) {
+                    await this.loadCustomers();
+                    this.selectedCustomerId = result.data.id;
+                    this.showCreateCustomerModal = false;
+                    Swal.fire({ icon: 'success', title: 'Pelanggan Ditambahkan', timer: 1300, showConfirmButton: false });
+                } else {
+                    const firstErr = result.errors ? Object.values(result.errors).flat()[0] : null;
+                    Swal.fire({ icon: 'error', title: 'Gagal', text: firstErr || result.message || 'Gagal menambah pelanggan.', confirmButtonColor: '#0D7A5F' });
+                }
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'Gagal', text: e.message || 'Koneksi ke server terputus.', confirmButtonColor: '#0D7A5F' });
+            } finally {
+                this.isSavingCustomer = false;
             }
         },
         async openHistoryModal() {
             if (!this.hasPosFeature('pos_allow_history')) return;
-            const res = await this.authFetch(`/api/pos/history?outlet_id=${this.currentOutlet.id || 1}`);
-            const data = await res.json();
-            this.historyList = data.data ? (Array.isArray(data.data) ? data.data : (data.data.data || [])) : [];
-            this.histSearch = '';
-            this.histStatusFilter = 'all';
-            this.histPayFilter = 'all';
-            this.histPage = 1;
-            this.showHistoryModal = true;
+            try {
+                const res = await this.authFetch(`/api/pos/history?outlet_id=${this.currentOutlet.id || 1}`);
+                const data = await this.parseJsonSafe(res);
+                if (!res.ok) {
+                    Swal.fire({ icon: 'error', title: 'Gagal Memuat Riwayat', text: data.message || 'Riwayat transaksi tidak dapat dibuka.', confirmButtonColor: '#0D7A5F' });
+                    return;
+                }
+                this.historyList = data.data ? (Array.isArray(data.data) ? data.data : (data.data.data || [])) : [];
+                this.histSearch = '';
+                this.histStatusFilter = 'all';
+                this.histPayFilter = 'all';
+                this.histPage = 1;
+                this.showHistoryModal = true;
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'Gagal Memuat Riwayat', text: e.message || 'Koneksi ke server terputus.', confirmButtonColor: '#0D7A5F' });
+            }
         },
         reprintReceipt(txn) {
             const out = txn.outlet || this.currentOutlet || {};
@@ -1408,6 +1645,7 @@ function posApp() {
                 Swal.fire({ icon: 'info', title: 'Mode Tinjau Pemilik', text: 'Pembatalan transaksi hanya dapat dijalankan oleh akun Kasir.', confirmButtonColor: '#0D7A5F' });
                 return;
             }
+            if (this.isProcessingVoid) return;
             const { value: reason } = await Swal.fire({
                 title: 'Alasan Pembatalan (Void)',
                 input: 'text',
@@ -1419,14 +1657,21 @@ function posApp() {
                 inputValidator: (v) => (!v || v.trim().length < 5) ? 'Alasan minimal 5 karakter.' : null,
             });
             if (reason) {
-                const res = await this.authFetch(`/api/pos/transactions/${txnId}/void`, { method: 'POST', body: JSON.stringify({ reason }) });
-                if (res.ok) {
-                    await this.openHistoryModal();
-                    await this.loadProducts();
-                    await this.loadShift();
-                } else {
-                    const err = await res.json();
-                    Swal.fire({ icon: 'error', title: 'Gagal', text: err.message || 'Gagal membatalkan transaksi.', confirmButtonColor: '#0D7A5F' });
+                this.isProcessingVoid = true;
+                try {
+                    const res = await this.authFetch(`/api/pos/transactions/${txnId}/void`, { method: 'POST', body: JSON.stringify({ reason }) });
+                    if (res.ok) {
+                        await this.openHistoryModal();
+                        await this.loadProducts();
+                        await this.loadShift();
+                    } else {
+                        const err = await this.parseJsonSafe(res);
+                        Swal.fire({ icon: 'error', title: 'Gagal', text: err.message || 'Gagal membatalkan transaksi.', confirmButtonColor: '#0D7A5F' });
+                    }
+                } catch (e) {
+                    Swal.fire({ icon: 'error', title: 'Gagal', text: e.message || 'Koneksi ke server terputus.', confirmButtonColor: '#0D7A5F' });
+                } finally {
+                    this.isProcessingVoid = false;
                 }
             }
         },

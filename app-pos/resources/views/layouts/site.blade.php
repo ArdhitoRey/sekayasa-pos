@@ -5,9 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Tandha by SEKA GROUP — Aplikasi Kasir, Stok Cabang & Solusi POS Bisnis')</title>
-    <link rel="icon" type="image/svg+xml" href="/assets/Logo%20Tandha.svg?v=5">
     <link rel="icon" type="image/png" sizes="192x192" href="/tandha-icon-192.png?v=5">
+    <link rel="icon" type="image/svg+xml" href="/assets/Logo%20Tandha.svg?v=5">
     <link rel="shortcut icon" href="/favicon.ico?v=5">
+    <link rel="manifest" href="/manifest.json?v=5">
+    <meta name="theme-color" content="#0D2620">
+    <link rel="apple-touch-icon" href="/tandha-maskable-192.png?v=5">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -72,7 +75,7 @@
 
                 <div class="nav-actions">
                     <template x-if="!isLoggedIn">
-                        <a href="/login?redirect=/dashboard?tab=billing" class="btn btn-mint btn-sm {{ request()->is('login') ? 'active-cta' : '' }}">
+                        <a href="/login?redirect={{ urlencode('/dashboard?tab=billing') }}" class="btn btn-mint btn-sm {{ request()->is('login') ? 'active-cta' : '' }}">
                             Masuk / Daftar
                         </a>
                     </template>
@@ -83,7 +86,7 @@
                                 <i class="dot"></i>
                                 <span x-text="user.name ? user.name.split(' ')[0] : 'Login'"></span>
                             </span>
-                            <a href="/dashboard" class="btn btn-mint btn-sm">
+                            <a :href="dashboardPath" class="btn btn-mint btn-sm" x-text="dashboardLabel">
                                 Dashboard Saya
                             </a>
                             <button type="button" @click="logout()" class="nav-logout-btn" title="Keluar dari akun" aria-label="Keluar">
@@ -95,10 +98,10 @@
 
                 <!-- Mobile Quick Action + Hamburger -->
                 <div class="nav-mobile-right">
-                    <a x-show="!isLoggedIn" href="/login?redirect=/dashboard?tab=billing" class="btn btn-mint btn-sm" style="padding: 0.42rem 0.78rem; font-size: 0.72rem;">
+                    <a x-show="!isLoggedIn" href="/login?redirect={{ urlencode('/dashboard?tab=billing') }}" class="btn btn-mint btn-sm" style="padding: 0.42rem 0.78rem; font-size: 0.72rem;">
                         Masuk
                     </a>
-                    <a x-show="isLoggedIn" x-cloak href="/dashboard" class="btn btn-mint btn-sm" style="padding: 0.42rem 0.78rem; font-size: 0.72rem;">
+                    <a x-show="isLoggedIn" x-cloak :href="dashboardPath" class="btn btn-mint btn-sm" style="padding: 0.42rem 0.78rem; font-size: 0.72rem;" x-text="user.role === 'cashier' ? 'Kasir POS' : 'Dashboard'">
                         Dashboard
                     </a>
                     <button type="button" @click="mobileNavOpen = !mobileNavOpen" class="nav-mobile-toggle" aria-label="Buka Menu Navigasi" :aria-expanded="mobileNavOpen">
@@ -117,11 +120,11 @@
             <a href="/contact" @click="mobileNavOpen = false" class="{{ request()->is('contact') ? 'active' : '' }}">Konsultasi Fitur</a>
             <div class="nav-mobile-drawer-divider"></div>
             <template x-if="!isLoggedIn">
-                <a href="/login?redirect=/dashboard?tab=billing" class="nav-mobile-cta">Masuk / Daftar Bisnis →</a>
+                <a href="/login?redirect={{ urlencode('/dashboard?tab=billing') }}" class="nav-mobile-cta">Masuk / Daftar Bisnis →</a>
             </template>
             <template x-if="isLoggedIn">
                 <div class="space-y-2">
-                    <a href="/dashboard" class="nav-mobile-cta">Buka Dashboard Saya →</a>
+                    <a :href="dashboardPath" class="nav-mobile-cta" x-text="'Buka ' + dashboardLabel + ' →'">Buka Dashboard Saya →</a>
                     <button type="button" @click="logout()" class="nav-mobile-logout">Keluar Akun (<span x-text="user.name ? user.name.split(' ')[0] : ''"></span>)</button>
                 </div>
             </template>
@@ -172,7 +175,7 @@
                         <li><a href="/client">Halaman Akun Klien</a></li>
                         <li><a href="/pos">Terminal Kasir POS</a></li>
                         <li><a href="/dashboard">Dashboard Pemilik</a></li>
-                        <li><a href="/login?redirect=/client">Masuk / Daftar Bisnis</a></li>
+                        <li><a href="/login?redirect={{ urlencode('/client') }}">Masuk / Daftar Bisnis</a></li>
                     </ul>
                 </div>
             </div>
@@ -189,9 +192,15 @@
             return {
                 mobileNavOpen: false,
                 token: localStorage.getItem('pos_token') || '',
-                user: JSON.parse(localStorage.getItem('pos_user') || '{}'),
+                user: (() => { try { return JSON.parse(localStorage.getItem('pos_user') || '{}') || {}; } catch (_) { localStorage.removeItem('pos_user'); return {}; } })(),
                 get isLoggedIn() {
                     return Boolean(this.token && this.user && this.user.id);
+                },
+                get dashboardPath() {
+                    return (this.user && this.user.role === 'cashier') ? '/pos' : '/dashboard';
+                },
+                get dashboardLabel() {
+                    return (this.user && this.user.role === 'cashier') ? 'Terminal Kasir' : 'Dashboard Saya';
                 },
                 async initAuth() {
                     if (!this.token) return;
